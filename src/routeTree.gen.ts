@@ -9,38 +9,234 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as AuthRouteImport } from './routes/auth'
+import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as EventSlugRouteImport } from './routes/event.$slug'
+import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated.dashboard'
+import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated.admin'
+import { Route as EventSlugIndexRouteImport } from './routes/event.$slug.index'
+import { Route as AuthenticatedAdminIndexRouteImport } from './routes/_authenticated.admin.index'
+import { Route as EventSlugVoiceRouteImport } from './routes/event.$slug.voice'
+import { Route as EventSlugNotesRouteImport } from './routes/event.$slug.notes'
+import { Route as EventSlugCaptureRouteImport } from './routes/event.$slug.capture'
+import { Route as EventSlugAlbumRouteImport } from './routes/event.$slug.album'
+import { Route as AuthenticatedDashboardCreateRouteImport } from './routes/_authenticated.dashboard.create'
+import { Route as AuthenticatedAdminGuestsRouteImport } from './routes/_authenticated.admin.guests'
+import { Route as AuthenticatedAdminEventsRouteImport } from './routes/_authenticated.admin.events'
+import { Route as AuthenticatedDashboardEventIdRouteImport } from './routes/_authenticated.dashboard.event.$id'
 
+const AuthRoute = AuthRouteImport.update({
+  id: '/auth',
+  path: '/auth',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthenticatedRoute = AuthenticatedRouteImport.update({
+  id: '/_authenticated',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const EventSlugRoute = EventSlugRouteImport.update({
+  id: '/event/$slug',
+  path: '/event/$slug',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthenticatedDashboardRoute = AuthenticatedDashboardRouteImport.update({
+  id: '/dashboard',
+  path: '/dashboard',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedAdminRoute = AuthenticatedAdminRouteImport.update({
+  id: '/admin',
+  path: '/admin',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const EventSlugIndexRoute = EventSlugIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => EventSlugRoute,
+} as any)
+const AuthenticatedAdminIndexRoute = AuthenticatedAdminIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AuthenticatedAdminRoute,
+} as any)
+const EventSlugVoiceRoute = EventSlugVoiceRouteImport.update({
+  id: '/voice',
+  path: '/voice',
+  getParentRoute: () => EventSlugRoute,
+} as any)
+const EventSlugNotesRoute = EventSlugNotesRouteImport.update({
+  id: '/notes',
+  path: '/notes',
+  getParentRoute: () => EventSlugRoute,
+} as any)
+const EventSlugCaptureRoute = EventSlugCaptureRouteImport.update({
+  id: '/capture',
+  path: '/capture',
+  getParentRoute: () => EventSlugRoute,
+} as any)
+const EventSlugAlbumRoute = EventSlugAlbumRouteImport.update({
+  id: '/album',
+  path: '/album',
+  getParentRoute: () => EventSlugRoute,
+} as any)
+const AuthenticatedDashboardCreateRoute =
+  AuthenticatedDashboardCreateRouteImport.update({
+    id: '/create',
+    path: '/create',
+    getParentRoute: () => AuthenticatedDashboardRoute,
+  } as any)
+const AuthenticatedAdminGuestsRoute =
+  AuthenticatedAdminGuestsRouteImport.update({
+    id: '/guests',
+    path: '/guests',
+    getParentRoute: () => AuthenticatedAdminRoute,
+  } as any)
+const AuthenticatedAdminEventsRoute =
+  AuthenticatedAdminEventsRouteImport.update({
+    id: '/events',
+    path: '/events',
+    getParentRoute: () => AuthenticatedAdminRoute,
+  } as any)
+const AuthenticatedDashboardEventIdRoute =
+  AuthenticatedDashboardEventIdRouteImport.update({
+    id: '/event/$id',
+    path: '/event/$id',
+    getParentRoute: () => AuthenticatedDashboardRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/auth': typeof AuthRoute
+  '/admin': typeof AuthenticatedAdminRouteWithChildren
+  '/dashboard': typeof AuthenticatedDashboardRouteWithChildren
+  '/event/$slug': typeof EventSlugRouteWithChildren
+  '/admin/events': typeof AuthenticatedAdminEventsRoute
+  '/admin/guests': typeof AuthenticatedAdminGuestsRoute
+  '/dashboard/create': typeof AuthenticatedDashboardCreateRoute
+  '/event/$slug/album': typeof EventSlugAlbumRoute
+  '/event/$slug/capture': typeof EventSlugCaptureRoute
+  '/event/$slug/notes': typeof EventSlugNotesRoute
+  '/event/$slug/voice': typeof EventSlugVoiceRoute
+  '/admin/': typeof AuthenticatedAdminIndexRoute
+  '/event/$slug/': typeof EventSlugIndexRoute
+  '/dashboard/event/$id': typeof AuthenticatedDashboardEventIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/auth': typeof AuthRoute
+  '/dashboard': typeof AuthenticatedDashboardRouteWithChildren
+  '/admin/events': typeof AuthenticatedAdminEventsRoute
+  '/admin/guests': typeof AuthenticatedAdminGuestsRoute
+  '/dashboard/create': typeof AuthenticatedDashboardCreateRoute
+  '/event/$slug/album': typeof EventSlugAlbumRoute
+  '/event/$slug/capture': typeof EventSlugCaptureRoute
+  '/event/$slug/notes': typeof EventSlugNotesRoute
+  '/event/$slug/voice': typeof EventSlugVoiceRoute
+  '/admin': typeof AuthenticatedAdminIndexRoute
+  '/event/$slug': typeof EventSlugIndexRoute
+  '/dashboard/event/$id': typeof AuthenticatedDashboardEventIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/_authenticated': typeof AuthenticatedRouteWithChildren
+  '/auth': typeof AuthRoute
+  '/_authenticated/admin': typeof AuthenticatedAdminRouteWithChildren
+  '/_authenticated/dashboard': typeof AuthenticatedDashboardRouteWithChildren
+  '/event/$slug': typeof EventSlugRouteWithChildren
+  '/_authenticated/admin/events': typeof AuthenticatedAdminEventsRoute
+  '/_authenticated/admin/guests': typeof AuthenticatedAdminGuestsRoute
+  '/_authenticated/dashboard/create': typeof AuthenticatedDashboardCreateRoute
+  '/event/$slug/album': typeof EventSlugAlbumRoute
+  '/event/$slug/capture': typeof EventSlugCaptureRoute
+  '/event/$slug/notes': typeof EventSlugNotesRoute
+  '/event/$slug/voice': typeof EventSlugVoiceRoute
+  '/_authenticated/admin/': typeof AuthenticatedAdminIndexRoute
+  '/event/$slug/': typeof EventSlugIndexRoute
+  '/_authenticated/dashboard/event/$id': typeof AuthenticatedDashboardEventIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/'
+  fullPaths:
+    | '/'
+    | '/auth'
+    | '/admin'
+    | '/dashboard'
+    | '/event/$slug'
+    | '/admin/events'
+    | '/admin/guests'
+    | '/dashboard/create'
+    | '/event/$slug/album'
+    | '/event/$slug/capture'
+    | '/event/$slug/notes'
+    | '/event/$slug/voice'
+    | '/admin/'
+    | '/event/$slug/'
+    | '/dashboard/event/$id'
   fileRoutesByTo: FileRoutesByTo
-  to: '/'
-  id: '__root__' | '/'
+  to:
+    | '/'
+    | '/auth'
+    | '/dashboard'
+    | '/admin/events'
+    | '/admin/guests'
+    | '/dashboard/create'
+    | '/event/$slug/album'
+    | '/event/$slug/capture'
+    | '/event/$slug/notes'
+    | '/event/$slug/voice'
+    | '/admin'
+    | '/event/$slug'
+    | '/dashboard/event/$id'
+  id:
+    | '__root__'
+    | '/'
+    | '/_authenticated'
+    | '/auth'
+    | '/_authenticated/admin'
+    | '/_authenticated/dashboard'
+    | '/event/$slug'
+    | '/_authenticated/admin/events'
+    | '/_authenticated/admin/guests'
+    | '/_authenticated/dashboard/create'
+    | '/event/$slug/album'
+    | '/event/$slug/capture'
+    | '/event/$slug/notes'
+    | '/event/$slug/voice'
+    | '/_authenticated/admin/'
+    | '/event/$slug/'
+    | '/_authenticated/dashboard/event/$id'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AuthenticatedRoute: typeof AuthenticatedRouteWithChildren
+  AuthRoute: typeof AuthRoute
+  EventSlugRoute: typeof EventSlugRouteWithChildren
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/auth': {
+      id: '/auth'
+      path: '/auth'
+      fullPath: '/auth'
+      preLoaderRoute: typeof AuthRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_authenticated': {
+      id: '/_authenticated'
+      path: ''
+      fullPath: '/'
+      preLoaderRoute: typeof AuthenticatedRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -48,11 +244,170 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/event/$slug': {
+      id: '/event/$slug'
+      path: '/event/$slug'
+      fullPath: '/event/$slug'
+      preLoaderRoute: typeof EventSlugRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_authenticated/dashboard': {
+      id: '/_authenticated/dashboard'
+      path: '/dashboard'
+      fullPath: '/dashboard'
+      preLoaderRoute: typeof AuthenticatedDashboardRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/admin': {
+      id: '/_authenticated/admin'
+      path: '/admin'
+      fullPath: '/admin'
+      preLoaderRoute: typeof AuthenticatedAdminRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/event/$slug/': {
+      id: '/event/$slug/'
+      path: '/'
+      fullPath: '/event/$slug/'
+      preLoaderRoute: typeof EventSlugIndexRouteImport
+      parentRoute: typeof EventSlugRoute
+    }
+    '/_authenticated/admin/': {
+      id: '/_authenticated/admin/'
+      path: '/'
+      fullPath: '/admin/'
+      preLoaderRoute: typeof AuthenticatedAdminIndexRouteImport
+      parentRoute: typeof AuthenticatedAdminRoute
+    }
+    '/event/$slug/voice': {
+      id: '/event/$slug/voice'
+      path: '/voice'
+      fullPath: '/event/$slug/voice'
+      preLoaderRoute: typeof EventSlugVoiceRouteImport
+      parentRoute: typeof EventSlugRoute
+    }
+    '/event/$slug/notes': {
+      id: '/event/$slug/notes'
+      path: '/notes'
+      fullPath: '/event/$slug/notes'
+      preLoaderRoute: typeof EventSlugNotesRouteImport
+      parentRoute: typeof EventSlugRoute
+    }
+    '/event/$slug/capture': {
+      id: '/event/$slug/capture'
+      path: '/capture'
+      fullPath: '/event/$slug/capture'
+      preLoaderRoute: typeof EventSlugCaptureRouteImport
+      parentRoute: typeof EventSlugRoute
+    }
+    '/event/$slug/album': {
+      id: '/event/$slug/album'
+      path: '/album'
+      fullPath: '/event/$slug/album'
+      preLoaderRoute: typeof EventSlugAlbumRouteImport
+      parentRoute: typeof EventSlugRoute
+    }
+    '/_authenticated/dashboard/create': {
+      id: '/_authenticated/dashboard/create'
+      path: '/create'
+      fullPath: '/dashboard/create'
+      preLoaderRoute: typeof AuthenticatedDashboardCreateRouteImport
+      parentRoute: typeof AuthenticatedDashboardRoute
+    }
+    '/_authenticated/admin/guests': {
+      id: '/_authenticated/admin/guests'
+      path: '/guests'
+      fullPath: '/admin/guests'
+      preLoaderRoute: typeof AuthenticatedAdminGuestsRouteImport
+      parentRoute: typeof AuthenticatedAdminRoute
+    }
+    '/_authenticated/admin/events': {
+      id: '/_authenticated/admin/events'
+      path: '/events'
+      fullPath: '/admin/events'
+      preLoaderRoute: typeof AuthenticatedAdminEventsRouteImport
+      parentRoute: typeof AuthenticatedAdminRoute
+    }
+    '/_authenticated/dashboard/event/$id': {
+      id: '/_authenticated/dashboard/event/$id'
+      path: '/event/$id'
+      fullPath: '/dashboard/event/$id'
+      preLoaderRoute: typeof AuthenticatedDashboardEventIdRouteImport
+      parentRoute: typeof AuthenticatedDashboardRoute
+    }
   }
 }
 
+interface AuthenticatedAdminRouteChildren {
+  AuthenticatedAdminEventsRoute: typeof AuthenticatedAdminEventsRoute
+  AuthenticatedAdminGuestsRoute: typeof AuthenticatedAdminGuestsRoute
+  AuthenticatedAdminIndexRoute: typeof AuthenticatedAdminIndexRoute
+}
+
+const AuthenticatedAdminRouteChildren: AuthenticatedAdminRouteChildren = {
+  AuthenticatedAdminEventsRoute: AuthenticatedAdminEventsRoute,
+  AuthenticatedAdminGuestsRoute: AuthenticatedAdminGuestsRoute,
+  AuthenticatedAdminIndexRoute: AuthenticatedAdminIndexRoute,
+}
+
+const AuthenticatedAdminRouteWithChildren =
+  AuthenticatedAdminRoute._addFileChildren(AuthenticatedAdminRouteChildren)
+
+interface AuthenticatedDashboardRouteChildren {
+  AuthenticatedDashboardCreateRoute: typeof AuthenticatedDashboardCreateRoute
+  AuthenticatedDashboardEventIdRoute: typeof AuthenticatedDashboardEventIdRoute
+}
+
+const AuthenticatedDashboardRouteChildren: AuthenticatedDashboardRouteChildren =
+  {
+    AuthenticatedDashboardCreateRoute: AuthenticatedDashboardCreateRoute,
+    AuthenticatedDashboardEventIdRoute: AuthenticatedDashboardEventIdRoute,
+  }
+
+const AuthenticatedDashboardRouteWithChildren =
+  AuthenticatedDashboardRoute._addFileChildren(
+    AuthenticatedDashboardRouteChildren,
+  )
+
+interface AuthenticatedRouteChildren {
+  AuthenticatedAdminRoute: typeof AuthenticatedAdminRouteWithChildren
+  AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRouteWithChildren
+}
+
+const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
+  AuthenticatedAdminRoute: AuthenticatedAdminRouteWithChildren,
+  AuthenticatedDashboardRoute: AuthenticatedDashboardRouteWithChildren,
+}
+
+const AuthenticatedRouteWithChildren = AuthenticatedRoute._addFileChildren(
+  AuthenticatedRouteChildren,
+)
+
+interface EventSlugRouteChildren {
+  EventSlugAlbumRoute: typeof EventSlugAlbumRoute
+  EventSlugCaptureRoute: typeof EventSlugCaptureRoute
+  EventSlugNotesRoute: typeof EventSlugNotesRoute
+  EventSlugVoiceRoute: typeof EventSlugVoiceRoute
+  EventSlugIndexRoute: typeof EventSlugIndexRoute
+}
+
+const EventSlugRouteChildren: EventSlugRouteChildren = {
+  EventSlugAlbumRoute: EventSlugAlbumRoute,
+  EventSlugCaptureRoute: EventSlugCaptureRoute,
+  EventSlugNotesRoute: EventSlugNotesRoute,
+  EventSlugVoiceRoute: EventSlugVoiceRoute,
+  EventSlugIndexRoute: EventSlugIndexRoute,
+}
+
+const EventSlugRouteWithChildren = EventSlugRoute._addFileChildren(
+  EventSlugRouteChildren,
+)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AuthenticatedRoute: AuthenticatedRouteWithChildren,
+  AuthRoute: AuthRoute,
+  EventSlugRoute: EventSlugRouteWithChildren,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
