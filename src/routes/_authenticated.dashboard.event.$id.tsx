@@ -8,7 +8,9 @@ import {
 } from "@/lib/kenangan.functions";
 import { resizeImageToDataUrl } from "@/lib/image-resize";
 import { downloadFile, safeFilename } from "@/lib/download";
-import { ArrowLeft, Copy, Download, Trash2, Upload, Power } from "lucide-react";
+import { exportZip } from "@/lib/zip-export";
+import { downloadQrPoster } from "@/lib/qr-poster";
+import { ArrowLeft, Copy, Download, Trash2, Upload, Power, Package, QrCode } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/dashboard/event/$id")({
   component: ManageEvent,
@@ -22,7 +24,9 @@ function ManageEvent() {
     queryFn: () => getEventForHost({ data: { id } }),
   });
   const fileRef = useRef<HTMLInputElement>(null);
+  const qrRef = useRef<HTMLDivElement>(null);
   const [busy, setBusy] = useState(false);
+  const [zipping, setZipping] = useState<"all" | "photos" | "voices" | null>(null);
 
   if (isLoading || !data) return <p className="py-10 text-ink/60">Loading…</p>;
 
@@ -60,6 +64,35 @@ function ManageEvent() {
     if (!confirm("Delete?")) return;
     await deleteMemory({ data: { id: mid } });
     qc.invalidateQueries({ queryKey: ["event", id] });
+  }
+
+  async function zip(kind: "all" | "photos" | "voices") {
+    setZipping(kind);
+    try {
+      const items: { url: string; filename: string }[] = [];
+      if (kind !== "voices") {
+        photos.forEach((p) => items.push({ url: p.signed_url, filename: `photos/${safeFilename(p.guest_name)}-${p.id.slice(0,6)}.jpg` }));
+      }
+      if (kind !== "photos") {
+        voices.forEach((v) => items.push({ url: v.signed_url, filename: `voices/${safeFilename(v.guest_name)}-${v.id.slice(0,6)}.webm` }));
+      }
+      if (!items.length) { toast.info("Nothing to download yet"); return; }
+      await exportZip(`${event.slug}-${kind}`, items);
+      toast.success("Download ready");
+    } catch (e) { toast.error((e as Error).message); }
+    finally { setZipping(null); }
+  }
+
+  async function poster() {
+    const svg = qrRef.current?.querySelector("svg");
+    if (!svg) return;
+    await downloadQrPoster({
+      svgEl: svg as SVGSVGElement,
+      title: event.title,
+      subtitle: event.date ? new Date(event.date).toLocaleDateString() : undefined,
+      url: guestUrl,
+      filename: event.slug,
+    });
   }
 
   return (

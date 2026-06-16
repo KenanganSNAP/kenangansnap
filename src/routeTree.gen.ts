@@ -22,6 +22,7 @@ import { Route as EventSlugNotesRouteImport } from './routes/event.$slug.notes'
 import { Route as EventSlugCaptureRouteImport } from './routes/event.$slug.capture'
 import { Route as EventSlugAlbumRouteImport } from './routes/event.$slug.album'
 import { Route as AuthenticatedDashboardCreateRouteImport } from './routes/_authenticated.dashboard.create'
+import { Route as AuthenticatedAdminMediaRouteImport } from './routes/_authenticated.admin.media'
 import { Route as AuthenticatedAdminGuestsRouteImport } from './routes/_authenticated.admin.guests'
 import { Route as AuthenticatedAdminEventsRouteImport } from './routes/_authenticated.admin.events'
 import { Route as AuthenticatedDashboardEventIdRouteImport } from './routes/_authenticated.dashboard.event.$id'
@@ -91,6 +92,11 @@ const AuthenticatedDashboardCreateRoute =
     path: '/create',
     getParentRoute: () => AuthenticatedDashboardRoute,
   } as any)
+const AuthenticatedAdminMediaRoute = AuthenticatedAdminMediaRouteImport.update({
+  id: '/media',
+  path: '/media',
+  getParentRoute: () => AuthenticatedAdminRoute,
+} as any)
 const AuthenticatedAdminGuestsRoute =
   AuthenticatedAdminGuestsRouteImport.update({
     id: '/guests',
@@ -118,6 +124,7 @@ export interface FileRoutesByFullPath {
   '/event/$slug': typeof EventSlugRouteWithChildren
   '/admin/events': typeof AuthenticatedAdminEventsRoute
   '/admin/guests': typeof AuthenticatedAdminGuestsRoute
+  '/admin/media': typeof AuthenticatedAdminMediaRoute
   '/dashboard/create': typeof AuthenticatedDashboardCreateRoute
   '/event/$slug/album': typeof EventSlugAlbumRoute
   '/event/$slug/capture': typeof EventSlugCaptureRoute
@@ -133,6 +140,7 @@ export interface FileRoutesByTo {
   '/dashboard': typeof AuthenticatedDashboardRouteWithChildren
   '/admin/events': typeof AuthenticatedAdminEventsRoute
   '/admin/guests': typeof AuthenticatedAdminGuestsRoute
+  '/admin/media': typeof AuthenticatedAdminMediaRoute
   '/dashboard/create': typeof AuthenticatedDashboardCreateRoute
   '/event/$slug/album': typeof EventSlugAlbumRoute
   '/event/$slug/capture': typeof EventSlugCaptureRoute
@@ -152,6 +160,7 @@ export interface FileRoutesById {
   '/event/$slug': typeof EventSlugRouteWithChildren
   '/_authenticated/admin/events': typeof AuthenticatedAdminEventsRoute
   '/_authenticated/admin/guests': typeof AuthenticatedAdminGuestsRoute
+  '/_authenticated/admin/media': typeof AuthenticatedAdminMediaRoute
   '/_authenticated/dashboard/create': typeof AuthenticatedDashboardCreateRoute
   '/event/$slug/album': typeof EventSlugAlbumRoute
   '/event/$slug/capture': typeof EventSlugCaptureRoute
@@ -171,6 +180,7 @@ export interface FileRouteTypes {
     | '/event/$slug'
     | '/admin/events'
     | '/admin/guests'
+    | '/admin/media'
     | '/dashboard/create'
     | '/event/$slug/album'
     | '/event/$slug/capture'
@@ -186,6 +196,7 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/admin/events'
     | '/admin/guests'
+    | '/admin/media'
     | '/dashboard/create'
     | '/event/$slug/album'
     | '/event/$slug/capture'
@@ -204,6 +215,7 @@ export interface FileRouteTypes {
     | '/event/$slug'
     | '/_authenticated/admin/events'
     | '/_authenticated/admin/guests'
+    | '/_authenticated/admin/media'
     | '/_authenticated/dashboard/create'
     | '/event/$slug/album'
     | '/event/$slug/capture'
@@ -314,6 +326,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedDashboardCreateRouteImport
       parentRoute: typeof AuthenticatedDashboardRoute
     }
+    '/_authenticated/admin/media': {
+      id: '/_authenticated/admin/media'
+      path: '/media'
+      fullPath: '/admin/media'
+      preLoaderRoute: typeof AuthenticatedAdminMediaRouteImport
+      parentRoute: typeof AuthenticatedAdminRoute
+    }
     '/_authenticated/admin/guests': {
       id: '/_authenticated/admin/guests'
       path: '/guests'
@@ -341,12 +360,14 @@ declare module '@tanstack/react-router' {
 interface AuthenticatedAdminRouteChildren {
   AuthenticatedAdminEventsRoute: typeof AuthenticatedAdminEventsRoute
   AuthenticatedAdminGuestsRoute: typeof AuthenticatedAdminGuestsRoute
+  AuthenticatedAdminMediaRoute: typeof AuthenticatedAdminMediaRoute
   AuthenticatedAdminIndexRoute: typeof AuthenticatedAdminIndexRoute
 }
 
 const AuthenticatedAdminRouteChildren: AuthenticatedAdminRouteChildren = {
   AuthenticatedAdminEventsRoute: AuthenticatedAdminEventsRoute,
   AuthenticatedAdminGuestsRoute: AuthenticatedAdminGuestsRoute,
+  AuthenticatedAdminMediaRoute: AuthenticatedAdminMediaRoute,
   AuthenticatedAdminIndexRoute: AuthenticatedAdminIndexRoute,
 }
 
