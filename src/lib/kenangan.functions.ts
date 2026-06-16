@@ -536,3 +536,145 @@ export const adminDeleteMemory = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
+
+// ADMIN: grant/revoke admin role, list admins
+export const listAdmins = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    await requireAdmin(context);
+    const { data: roles, error } = await context.supabase
+      .from("user_roles").select("user_id").eq("role", "admin");
+    if (error) throw new Error(error.message);
+    const ids = (roles ?? []).map((r) => r.user_id);
+    if (ids.length === 0) return [];
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: usersData } = await supabaseAdmin.auth.admin.listUsers({ perPage: 1000 });
+    const map = new Map((usersData?.users ?? []).map((u) => [u.id, u.email ?? ""]));
+    return ids.map((id) => ({ user_id: id, email: map.get(id) ?? "" }));
+  });
+
+export const grantAdminByEmail = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { email: string }) => z.object({ email: z.string().email() }).parse(d))
+  .handler(async ({ data, context }) => {
+    await requireAdmin(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const target = data.email.toLowerCase().trim();
+    const { data: usersData } = await supabaseAdmin.auth.admin.listUsers({ perPage: 1000 });
+    const user = (usersData?.users ?? []).find((u) => (u.email ?? "").toLowerCase() === target);
+    if (!user) throw new Error("No user with that email. Ask them to sign up first.");
+    const { error } = await supabaseAdmin.from("user_roles")
+      .upsert({ user_id: user.id, role: "admin" }, { onConflict: "user_id,role" });
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+export const revokeAdmin = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { userId: string }) => z.object({ userId: z.string().uuid() }).parse(d))
+  .handler(async ({ data, context }) => {
+    await requireAdmin(context);
+    if (data.userId === context.userId) throw new Error("You cannot revoke your own admin access.");
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { error } = await supabaseAdmin.from("user_roles")
+      .delete().eq("user_id", data.userId).eq("role", "admin");
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+// ADMIN: delete event / guest
+export const adminDeleteEvent = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { eventId: string }) => z.object({ eventId: z.string().uuid() }).parse(d))
+  .handler(async ({ data, context }) => {
+    await requireAdmin(context);
+    // Best-effort cleanup of storage files for this event before cascade delete
+    const [{ data: photos }, { data: mems }, { data: ev }] = await Promise.all([
+      context.supabase.from("photos").select("storage_url").eq("event_id", data.eventId),
+      context.supabase.from("memories").select("audio_url").eq("event_id", data.eventId),
+      context.supabase.from("events").select("cover_image_url, invitation_image_url").eq("id", data.eventId).maybeSingle(),
+    ]);
+    const photoPaths = (photos ?? []).map((p) => p.storage_url).filter(Boolean) as string[];
+    const audioPaths = (mems ?? []).map((m) => m.audio_url).filter(Boolean) as string[];
+    if (photoPaths.length) await context.supabase.storage.from("photos").remove(photoPaths);
+    if (audioPaths.length) await context.supabase.storage.from("audio-memories").remove(audioPaths);
+    if (ev?.cover_image_url) await context.supabase.storage.from("event-covers").remove([ev.cover_image_url]);
+    if (ev?.invitation_image_url) await context.supabase.storage.from("event-invitations").remove([ev.invitation_image_url]);
+    const { error } = await context.supabase.from("events").delete().eq("id", data.eventId);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+export const adminDeleteGuest = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { guestId: string }) => z.object({ guestId: z.string().uuid() }).parse(d))
+  .handler(async ({ data, context }) => {
+    await requireAdmin(context);
+    const { error } = await context.supabase.from("guests").delete().eq("id", data.guestId);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+// HOMEPAGE settings
+export type HomepageSettings = {
+  hero_eyebrow: string;
+  hero_title_line1: string;
+  hero_title_line2: string;
+  hero_subtitle: string;
+  cta_primary: string;
+  cta_secondary: string;
+  section_title: string;
+  section_subtitle: string;
+  features: { title: string; body: string }[];
+  footer_note: string;
+};
+
+const homepageDefaults: HomepageSettings = {
+  hero_eyebrow: "A live memory booth",
+  hero_title_line1: "Every guest.",
+  hero_title_line2: "Every memory.",
+  hero_subtitle: "One QR code at the door. Your guests send photos, voice notes, and heartfelt messages straight to your private album — no app, no sign-ups.",
+  cta_primary: "Start your event",
+  cta_secondary: "See how it works",
+  section_title: "A booth without a booth",
+  section_subtitle: "Four ways your guests can leave something behind — gathered into one elegant private album.",
+  features: [
+    { title: "One QR", body: "Print it, frame it, project it. Guests scan and they're in." },
+    { title: "Film photos", body: "Live camera with five tactile film filters — warm, fade, noir, golden, cinematic." },
+    { title: "Voice notes", body: "Hold-to-record up to 60 seconds. The voice you remember, kept forever." },
+    { title: "Written wishes", body: "A small page for the long messages — doa, jokes, secrets." },
+  ],
+  footer_note: "Crafted with care",
+};
+
+export const getHomepageSettings = createServerFn({ method: "GET" })
+  .handler(async (): Promise<HomepageSettings> => {
+    const sb = publicClient();
+    const { data } = await sb.from("site_settings").select("settings").eq("key", "homepage").maybeSingle();
+    const merged = { ...homepageDefaults, ...(data?.settings as Partial<HomepageSettings> ?? {}) };
+    return merged;
+  });
+
+export const updateHomepageSettings = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { settings: HomepageSettings }) => z.object({
+    settings: z.object({
+      hero_eyebrow: z.string().max(120),
+      hero_title_line1: z.string().max(120),
+      hero_title_line2: z.string().max(120),
+      hero_subtitle: z.string().max(600),
+      cta_primary: z.string().max(60),
+      cta_secondary: z.string().max(60),
+      section_title: z.string().max(120),
+      section_subtitle: z.string().max(400),
+      features: z.array(z.object({ title: z.string().max(60), body: z.string().max(300) })).length(4),
+      footer_note: z.string().max(200),
+    }),
+  }).parse(d))
+  .handler(async ({ data, context }) => {
+    await requireAdmin(context);
+    const { error } = await context.supabase.from("site_settings")
+      .upsert({ key: "homepage", settings: data.settings, updated_at: new Date().toISOString(), updated_by: context.userId });
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
