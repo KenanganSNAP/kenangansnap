@@ -20,7 +20,8 @@ function CreateEvent() {
   const [slug, setSlug] = useState("");
   const [slugTouched, setSlugTouched] = useState(false);
   const [editingSlug, setEditingSlug] = useState(false);
-  const autoSlug = slugify(title) ? `${slugify(title)}-${randomSuffix()}` : "";
+  const base = slugify(title);
+  const autoSlug = useMemo(() => (base ? `${base}-${randomSuffix()}` : ""), [base]);
   const effectiveSlug = slugTouched ? slug : autoSlug;
   const origin = typeof window !== "undefined" ? window.location.origin : "";
   const [eventType, setEventType] = useState<"wedding" | "birthday" | "party" | "travel" | "ceremony">("wedding");
