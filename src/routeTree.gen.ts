@@ -33,6 +33,7 @@ import { Route as AuthenticatedAdminEventsRouteImport } from './routes/_authenti
 import { Route as AuthenticatedDashboardEventIdRouteImport } from './routes/_authenticated.dashboard.event.$id'
 import { Route as AuthenticatedAdminPagesPricingRouteImport } from './routes/_authenticated.admin.pages.pricing'
 import { Route as AuthenticatedAdminPagesHowItWorksRouteImport } from './routes/_authenticated.admin.pages.how-it-works'
+import { Route as AuthenticatedAdminPagesCreateEventFormRouteImport } from './routes/_authenticated.admin.pages.create-event-form'
 import { Route as AuthenticatedAdminPagesAboutRouteImport } from './routes/_authenticated.admin.pages.about'
 import { Route as AuthenticatedAdminEventsIdRouteImport } from './routes/_authenticated.admin.events.$id'
 
@@ -163,6 +164,12 @@ const AuthenticatedAdminPagesHowItWorksRoute =
     path: '/pages/how-it-works',
     getParentRoute: () => AuthenticatedAdminRoute,
   } as any)
+const AuthenticatedAdminPagesCreateEventFormRoute =
+  AuthenticatedAdminPagesCreateEventFormRouteImport.update({
+    id: '/pages/create-event-form',
+    path: '/pages/create-event-form',
+    getParentRoute: () => AuthenticatedAdminRoute,
+  } as any)
 const AuthenticatedAdminPagesAboutRoute =
   AuthenticatedAdminPagesAboutRouteImport.update({
     id: '/pages/about',
@@ -199,6 +206,7 @@ export interface FileRoutesByFullPath {
   '/event/$slug/': typeof EventSlugIndexRoute
   '/admin/events/$id': typeof AuthenticatedAdminEventsIdRoute
   '/admin/pages/about': typeof AuthenticatedAdminPagesAboutRoute
+  '/admin/pages/create-event-form': typeof AuthenticatedAdminPagesCreateEventFormRoute
   '/admin/pages/how-it-works': typeof AuthenticatedAdminPagesHowItWorksRoute
   '/admin/pages/pricing': typeof AuthenticatedAdminPagesPricingRoute
   '/dashboard/event/$id': typeof AuthenticatedDashboardEventIdRoute
@@ -223,6 +231,7 @@ export interface FileRoutesByTo {
   '/event/$slug': typeof EventSlugIndexRoute
   '/admin/events/$id': typeof AuthenticatedAdminEventsIdRoute
   '/admin/pages/about': typeof AuthenticatedAdminPagesAboutRoute
+  '/admin/pages/create-event-form': typeof AuthenticatedAdminPagesCreateEventFormRoute
   '/admin/pages/how-it-works': typeof AuthenticatedAdminPagesHowItWorksRoute
   '/admin/pages/pricing': typeof AuthenticatedAdminPagesPricingRoute
   '/dashboard/event/$id': typeof AuthenticatedDashboardEventIdRoute
@@ -252,6 +261,7 @@ export interface FileRoutesById {
   '/event/$slug/': typeof EventSlugIndexRoute
   '/_authenticated/admin/events/$id': typeof AuthenticatedAdminEventsIdRoute
   '/_authenticated/admin/pages/about': typeof AuthenticatedAdminPagesAboutRoute
+  '/_authenticated/admin/pages/create-event-form': typeof AuthenticatedAdminPagesCreateEventFormRoute
   '/_authenticated/admin/pages/how-it-works': typeof AuthenticatedAdminPagesHowItWorksRoute
   '/_authenticated/admin/pages/pricing': typeof AuthenticatedAdminPagesPricingRoute
   '/_authenticated/dashboard/event/$id': typeof AuthenticatedDashboardEventIdRoute
@@ -281,6 +291,7 @@ export interface FileRouteTypes {
     | '/event/$slug/'
     | '/admin/events/$id'
     | '/admin/pages/about'
+    | '/admin/pages/create-event-form'
     | '/admin/pages/how-it-works'
     | '/admin/pages/pricing'
     | '/dashboard/event/$id'
@@ -305,6 +316,7 @@ export interface FileRouteTypes {
     | '/event/$slug'
     | '/admin/events/$id'
     | '/admin/pages/about'
+    | '/admin/pages/create-event-form'
     | '/admin/pages/how-it-works'
     | '/admin/pages/pricing'
     | '/dashboard/event/$id'
@@ -333,6 +345,7 @@ export interface FileRouteTypes {
     | '/event/$slug/'
     | '/_authenticated/admin/events/$id'
     | '/_authenticated/admin/pages/about'
+    | '/_authenticated/admin/pages/create-event-form'
     | '/_authenticated/admin/pages/how-it-works'
     | '/_authenticated/admin/pages/pricing'
     | '/_authenticated/dashboard/event/$id'
@@ -518,6 +531,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminPagesHowItWorksRouteImport
       parentRoute: typeof AuthenticatedAdminRoute
     }
+    '/_authenticated/admin/pages/create-event-form': {
+      id: '/_authenticated/admin/pages/create-event-form'
+      path: '/pages/create-event-form'
+      fullPath: '/admin/pages/create-event-form'
+      preLoaderRoute: typeof AuthenticatedAdminPagesCreateEventFormRouteImport
+      parentRoute: typeof AuthenticatedAdminRoute
+    }
     '/_authenticated/admin/pages/about': {
       id: '/_authenticated/admin/pages/about'
       path: '/pages/about'
@@ -556,6 +576,7 @@ interface AuthenticatedAdminRouteChildren {
   AuthenticatedAdminMediaRoute: typeof AuthenticatedAdminMediaRoute
   AuthenticatedAdminIndexRoute: typeof AuthenticatedAdminIndexRoute
   AuthenticatedAdminPagesAboutRoute: typeof AuthenticatedAdminPagesAboutRoute
+  AuthenticatedAdminPagesCreateEventFormRoute: typeof AuthenticatedAdminPagesCreateEventFormRoute
   AuthenticatedAdminPagesHowItWorksRoute: typeof AuthenticatedAdminPagesHowItWorksRoute
   AuthenticatedAdminPagesPricingRoute: typeof AuthenticatedAdminPagesPricingRoute
 }
@@ -567,6 +588,8 @@ const AuthenticatedAdminRouteChildren: AuthenticatedAdminRouteChildren = {
   AuthenticatedAdminMediaRoute: AuthenticatedAdminMediaRoute,
   AuthenticatedAdminIndexRoute: AuthenticatedAdminIndexRoute,
   AuthenticatedAdminPagesAboutRoute: AuthenticatedAdminPagesAboutRoute,
+  AuthenticatedAdminPagesCreateEventFormRoute:
+    AuthenticatedAdminPagesCreateEventFormRoute,
   AuthenticatedAdminPagesHowItWorksRoute:
     AuthenticatedAdminPagesHowItWorksRoute,
   AuthenticatedAdminPagesPricingRoute: AuthenticatedAdminPagesPricingRoute,
