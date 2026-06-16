@@ -14,16 +14,239 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      events: {
+        Row: {
+          cover_image_url: string | null
+          created_at: string
+          date: string | null
+          event_type: string
+          host_id: string
+          id: string
+          invitation_image_url: string | null
+          is_active: boolean
+          reveal_at: string | null
+          slug: string
+          title: string
+          venue: string | null
+          welcome_message: string | null
+        }
+        Insert: {
+          cover_image_url?: string | null
+          created_at?: string
+          date?: string | null
+          event_type?: string
+          host_id: string
+          id?: string
+          invitation_image_url?: string | null
+          is_active?: boolean
+          reveal_at?: string | null
+          slug: string
+          title: string
+          venue?: string | null
+          welcome_message?: string | null
+        }
+        Update: {
+          cover_image_url?: string | null
+          created_at?: string
+          date?: string | null
+          event_type?: string
+          host_id?: string
+          id?: string
+          invitation_image_url?: string | null
+          is_active?: boolean
+          reveal_at?: string | null
+          slug?: string
+          title?: string
+          venue?: string | null
+          welcome_message?: string | null
+        }
+        Relationships: []
+      }
+      guests: {
+        Row: {
+          created_at: string
+          event_id: string
+          id: string
+          name: string
+          session_token: string
+        }
+        Insert: {
+          created_at?: string
+          event_id: string
+          id?: string
+          name: string
+          session_token: string
+        }
+        Update: {
+          created_at?: string
+          event_id?: string
+          id?: string
+          name?: string
+          session_token?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "guests_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      hosts: {
+        Row: {
+          created_at: string
+          email: string
+          status: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          status?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          status?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      memories: {
+        Row: {
+          audio_url: string | null
+          content: string | null
+          created_at: string
+          event_id: string
+          guest_id: string | null
+          guest_name: string
+          id: string
+          type: string
+        }
+        Insert: {
+          audio_url?: string | null
+          content?: string | null
+          created_at?: string
+          event_id: string
+          guest_id?: string | null
+          guest_name: string
+          id?: string
+          type: string
+        }
+        Update: {
+          audio_url?: string | null
+          content?: string | null
+          created_at?: string
+          event_id?: string
+          guest_id?: string | null
+          guest_name?: string
+          id?: string
+          type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "memories_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "memories_guest_id_fkey"
+            columns: ["guest_id"]
+            isOneToOne: false
+            referencedRelation: "guests"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      photos: {
+        Row: {
+          created_at: string
+          event_id: string
+          filter_applied: string | null
+          guest_id: string | null
+          guest_name: string
+          id: string
+          media_type: string
+          storage_url: string
+        }
+        Insert: {
+          created_at?: string
+          event_id: string
+          filter_applied?: string | null
+          guest_id?: string | null
+          guest_name: string
+          id?: string
+          media_type?: string
+          storage_url: string
+        }
+        Update: {
+          created_at?: string
+          event_id?: string
+          filter_applied?: string | null
+          guest_id?: string | null
+          guest_name?: string
+          id?: string
+          media_type?: string
+          storage_url?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "photos_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "photos_guest_id_fkey"
+            columns: ["guest_id"]
+            isOneToOne: false
+            referencedRelation: "guests"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_roles: {
+        Row: {
+          created_at: string
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "admin" | "host"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +373,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["admin", "host"],
+    },
   },
 } as const
