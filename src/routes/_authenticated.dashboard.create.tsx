@@ -18,6 +18,11 @@ function CreateEvent() {
   const nav = useNavigate();
   const [title, setTitle] = useState("");
   const [slug, setSlug] = useState("");
+  const [slugTouched, setSlugTouched] = useState(false);
+  const [editingSlug, setEditingSlug] = useState(false);
+  const autoSlug = slugify(title) ? `${slugify(title)}-${randomSuffix()}` : "";
+  const effectiveSlug = slugTouched ? slug : autoSlug;
+  const origin = typeof window !== "undefined" ? window.location.origin : "";
   const [eventType, setEventType] = useState<"wedding" | "birthday" | "party" | "travel" | "ceremony">("wedding");
   const [date, setDate] = useState("");
   const [venue, setVenue] = useState("");
