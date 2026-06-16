@@ -305,7 +305,7 @@ export const updateHomepageExtras = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     await requireAdmin(context);
     const { error } = await context.supabase.from("site_settings")
-      .upsert({ key: "homepage_extras", settings: data.settings, updated_at: new Date().toISOString(), updated_by: context.userId });
+      .upsert({ key: "homepage_extras", settings: data.settings as unknown as Json, updated_at: new Date().toISOString(), updated_by: context.userId });
     if (error) throw new Error(error.message);
     return { ok: true };
   });
