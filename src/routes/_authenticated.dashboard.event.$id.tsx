@@ -8,7 +8,9 @@ import {
 } from "@/lib/kenangan.functions";
 import { resizeImageToDataUrl } from "@/lib/image-resize";
 import { downloadFile, safeFilename } from "@/lib/download";
-import { ArrowLeft, Copy, Download, Trash2, Upload, Power } from "lucide-react";
+import { exportZip } from "@/lib/zip-export";
+import { downloadQrPoster } from "@/lib/qr-poster";
+import { ArrowLeft, Copy, Download, Trash2, Upload, Power, Package, QrCode } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/dashboard/event/$id")({
   component: ManageEvent,
@@ -22,7 +24,9 @@ function ManageEvent() {
     queryFn: () => getEventForHost({ data: { id } }),
   });
   const fileRef = useRef<HTMLInputElement>(null);
+  const qrRef = useRef<HTMLDivElement>(null);
   const [busy, setBusy] = useState(false);
+  const [zipping, setZipping] = useState<"all" | "photos" | "voices" | null>(null);
 
   if (isLoading || !data) return <p className="py-10 text-ink/60">Loading…</p>;
 
@@ -62,18 +66,52 @@ function ManageEvent() {
     qc.invalidateQueries({ queryKey: ["event", id] });
   }
 
+  async function zip(kind: "all" | "photos" | "voices") {
+    setZipping(kind);
+    try {
+      const items: { url: string; filename: string }[] = [];
+      if (kind !== "voices") {
+        photos.forEach((p) => items.push({ url: p.signed_url, filename: `photos/${safeFilename(p.guest_name)}-${p.id.slice(0,6)}.jpg` }));
+      }
+      if (kind !== "photos") {
+        voices.forEach((v) => items.push({ url: v.signed_url, filename: `voices/${safeFilename(v.guest_name)}-${v.id.slice(0,6)}.webm` }));
+      }
+      if (!items.length) { toast.info("Nothing to download yet"); return; }
+      await exportZip(`${event.slug}-${kind}`, items);
+      toast.success("Download ready");
+    } catch (e) { toast.error((e as Error).message); }
+    finally { setZipping(null); }
+  }
+
+  async function poster() {
+    const svg = qrRef.current?.querySelector("svg");
+    if (!svg) return;
+    await downloadQrPoster({
+      svgEl: svg as SVGSVGElement,
+      title: event.title,
+      subtitle: event.date ? new Date(event.date).toLocaleDateString() : undefined,
+      url: guestUrl,
+      filename: event.slug,
+    });
+  }
+
   return (
     <div className="py-4">
       <Link to="/dashboard" className="inline-flex items-center gap-1 text-sm text-ink/70"><ArrowLeft size={14} /> Back</Link>
 
       <header className="mt-4 grid gap-6 rounded-3xl border border-ink/10 bg-card p-6 lg:grid-cols-[auto,1fr]">
         <div className="flex flex-col items-center gap-3">
-          <div className="rounded-2xl bg-cream p-3 shadow-[0_10px_30px_-15px_rgba(40,25,15,0.3)]">
+          <div ref={qrRef} className="rounded-2xl bg-cream p-3 shadow-[0_10px_30px_-15px_rgba(40,25,15,0.3)]">
             <QRCodeSVG value={guestUrl} size={180} bgColor="transparent" fgColor="#2a1d14" level="M" />
           </div>
-          <button onClick={copy} className="inline-flex items-center gap-1 rounded-full border border-ink/15 px-3 py-1.5 text-xs">
-            <Copy size={12} /> Copy link
-          </button>
+          <div className="flex flex-wrap justify-center gap-2">
+            <button onClick={copy} className="inline-flex items-center gap-1 rounded-full border border-ink/15 px-3 py-1.5 text-xs">
+              <Copy size={12} /> Copy link
+            </button>
+            <button onClick={poster} className="inline-flex items-center gap-1 rounded-full border border-ink/15 px-3 py-1.5 text-xs">
+              <QrCode size={12} /> Poster
+            </button>
+          </div>
         </div>
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2 text-[10px] uppercase tracking-[0.3em] text-ink/55">
@@ -106,6 +144,10 @@ function ManageEvent() {
             </button>
             <input ref={fileRef} type="file" accept="image/*" className="hidden"
               onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadInvite(f); }} />
+            <button onClick={() => zip("all")} disabled={zipping !== null}
+              className="inline-flex items-center gap-1 rounded-full bg-ink px-3 py-1.5 text-sm text-cream disabled:opacity-60">
+              <Package size={14} /> {zipping === "all" ? "Packing…" : "Download all"}
+            </button>
           </div>
         </div>
       </header>

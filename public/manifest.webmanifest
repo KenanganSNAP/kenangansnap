@@ -1,0 +1,12 @@
+{
+  "name": "KenanganSnap",
+  "short_name": "Kenangan",
+  "description": "Collect every moment of your event with a single QR.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f6ecdc",
+  "theme_color": "#f6ecdc",
+  "icons": [
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}

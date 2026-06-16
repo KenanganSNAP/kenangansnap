@@ -485,3 +485,54 @@ export const listAllGuests = createServerFn({ method: "GET" })
     if (error) throw new Error(error.message);
     return data ?? [];
   });
+
+// ADMIN: list all media across events (signed URLs)
+export const listAllMedia = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    await requireAdmin(context);
+    const [photoRes, memRes, evRes] = await Promise.all([
+      context.supabase.from("photos").select("id, guest_name, storage_url, event_id, created_at").order("created_at", { ascending: false }).limit(300),
+      context.supabase.from("memories").select("id, guest_name, type, content, audio_url, event_id, created_at").order("created_at", { ascending: false }).limit(300),
+      context.supabase.from("events").select("id, title, slug"),
+    ]);
+    const evMap = new Map((evRes.data ?? []).map((e) => [e.id, e]));
+    const photos = await Promise.all((photoRes.data ?? []).map(async (p) => {
+      const { data: s } = await context.supabase.storage.from("photos").createSignedUrl(p.storage_url, 60 * 60);
+      return { ...p, signed_url: s?.signedUrl ?? "", event: evMap.get(p.event_id) ?? null };
+    }));
+    const voices = await Promise.all((memRes.data ?? []).filter((m) => m.type === "voice").map(async (m) => {
+      const { data: s } = m.audio_url ? await context.supabase.storage.from("audio-memories").createSignedUrl(m.audio_url, 60 * 60) : { data: null };
+      return { id: m.id, guest_name: m.guest_name, signed_url: s?.signedUrl ?? "", created_at: m.created_at, event: evMap.get(m.event_id) ?? null };
+    }));
+    const notes = (memRes.data ?? []).filter((m) => m.type === "note").map((m) => ({
+      id: m.id, guest_name: m.guest_name, content: m.content ?? "", created_at: m.created_at, event: evMap.get(m.event_id) ?? null,
+    }));
+    return { photos, voices, notes };
+  });
+
+// ADMIN: delete any photo / memory
+export const adminDeletePhoto = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { id: string }) => z.object({ id: z.string().uuid() }).parse(d))
+  .handler(async ({ data, context }) => {
+    await requireAdmin(context);
+    const { data: row } = await context.supabase.from("photos").select("storage_url").eq("id", data.id).maybeSingle();
+    if (row?.storage_url) await context.supabase.storage.from("photos").remove([row.storage_url]);
+    const { error } = await context.supabase.from("photos").delete().eq("id", data.id);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+export const adminDeleteMemory = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { id: string }) => z.object({ id: z.string().uuid() }).parse(d))
+  .handler(async ({ data, context }) => {
+    await requireAdmin(context);
+    const { data: row } = await context.supabase.from("memories").select("audio_url").eq("id", data.id).maybeSingle();
+    if (row?.audio_url) await context.supabase.storage.from("audio-memories").remove([row.audio_url]);
+    const { error } = await context.supabase.from("memories").delete().eq("id", data.id);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
