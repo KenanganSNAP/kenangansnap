@@ -1,0 +1,487 @@
+import { createServerFn } from "@tanstack/react-start";
+import { z } from "zod";
+import { createClient } from "@supabase/supabase-js";
+import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import type { Database } from "@/integrations/supabase/types";
+
+function publicClient() {
+  return createClient<Database>(
+    process.env.SUPABASE_URL!,
+    process.env.SUPABASE_PUBLISHABLE_KEY!,
+    { auth: { storage: undefined, persistSession: false, autoRefreshToken: false } },
+  );
+}
+
+// PUBLIC: Get event by slug (anon)
+export const getEventBySlug = createServerFn({ method: "GET" })
+  .inputValidator((d: { slug: string }) => z.object({ slug: z.string().min(1) }).parse(d))
+  .handler(async ({ data }) => {
+    const sb = publicClient();
+    const { data: event, error } = await sb
+      .from("events")
+      .select("id, slug, title, event_type, date, venue, welcome_message, cover_image_url, invitation_image_url, reveal_at, is_active")
+      .eq("slug", data.slug)
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    if (!event) return null;
+    // Sign cover + invitation if present
+    let coverUrl: string | null = null;
+    let inviteUrl: string | null = null;
+    if (event.cover_image_url) {
+      const { data: s } = await sb.storage.from("event-covers").createSignedUrl(event.cover_image_url, 60 * 60);
+      coverUrl = s?.signedUrl ?? null;
+    }
+    if (event.invitation_image_url) {
+      const { data: s } = await sb.storage.from("event-invitations").createSignedUrl(event.invitation_image_url, 60 * 60);
+      inviteUrl = s?.signedUrl ?? null;
+    }
+    return { ...event, cover_signed_url: coverUrl, invitation_signed_url: inviteUrl };
+  });
+
+// PUBLIC: Register guest
+export const registerGuest = createServerFn({ method: "POST" })
+  .inputValidator((d: { slug: string; name: string; sessionToken: string }) =>
+    z.object({
+      slug: z.string().min(1),
+      name: z.string().min(1).max(60),
+      sessionToken: z.string().min(8),
+    }).parse(d),
+  )
+  .handler(async ({ data }) => {
+    const sb = publicClient();
+    const { data: event, error: eErr } = await sb
+      .from("events").select("id, is_active").eq("slug", data.slug).maybeSingle();
+    if (eErr) throw new Error(eErr.message);
+    if (!event || !event.is_active) throw new Error("Event not available");
+
+    // Idempotent upsert via unique (event_id, session_token)
+    const { data: existing } = await sb.from("guests")
+      .select("id, name").eq("event_id", event.id).eq("session_token", data.sessionToken).maybeSingle();
+    if (existing) return { guestId: existing.id, name: existing.name };
+
+    const { data: inserted, error } = await sb.from("guests")
+      .insert({ event_id: event.id, name: data.name, session_token: data.sessionToken })
+      .select("id, name").single();
+    if (error) throw new Error(error.message);
+    return { guestId: inserted.id, name: inserted.name };
+  });
+
+// PUBLIC: Upload photo (data URL base64 from canvas)
+export const uploadPhoto = createServerFn({ method: "POST" })
+  .inputValidator((d: { slug: string; guestId: string; guestName: string; filter: string; dataUrl: string }) =>
+    z.object({
+      slug: z.string().min(1),
+      guestId: z.string().uuid(),
+      guestName: z.string().min(1).max(60),
+      filter: z.string().max(20),
+      dataUrl: z.string().startsWith("data:image/").max(20_000_000),
+    }).parse(d),
+  )
+  .handler(async ({ data }) => {
+    const sb = publicClient();
+    const { data: event, error: eErr } = await sb.from("events")
+      .select("id, is_active").eq("slug", data.slug).maybeSingle();
+    if (eErr) throw new Error(eErr.message);
+    if (!event || !event.is_active) throw new Error("Event not available");
+
+    const [meta, b64] = data.dataUrl.split(",");
+    const mime = meta.match(/data:(.*?);base64/)?.[1] ?? "image/jpeg";
+    const ext = mime.includes("png") ? "png" : "jpg";
+    const bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+    const path = `${event.id}/${crypto.randomUUID()}.${ext}`;
+
+    const { error: upErr } = await sb.storage.from("photos").upload(path, bytes, {
+      contentType: mime, upsert: false,
+    });
+    if (upErr) throw new Error(upErr.message);
+
+    const { error: insErr, data: row } = await sb.from("photos").insert({
+      event_id: event.id,
+      guest_id: data.guestId,
+      guest_name: data.guestName,
+      storage_url: path,
+      media_type: "photo",
+      filter_applied: data.filter,
+    }).select("id").single();
+    if (insErr) throw new Error(insErr.message);
+    return { id: row.id };
+  });
+
+// PUBLIC: Upload voice
+export const uploadVoice = createServerFn({ method: "POST" })
+  .inputValidator((d: { slug: string; guestId: string; guestName: string; dataUrl: string }) =>
+    z.object({
+      slug: z.string().min(1),
+      guestId: z.string().uuid(),
+      guestName: z.string().min(1).max(60),
+      dataUrl: z.string().startsWith("data:").max(20_000_000),
+    }).parse(d),
+  )
+  .handler(async ({ data }) => {
+    const sb = publicClient();
+    const { data: event, error: eErr } = await sb.from("events")
+      .select("id, is_active").eq("slug", data.slug).maybeSingle();
+    if (eErr) throw new Error(eErr.message);
+    if (!event || !event.is_active) throw new Error("Event not available");
+
+    const [meta, b64] = data.dataUrl.split(",");
+    const mime = meta.match(/data:(.*?);base64/)?.[1] ?? "audio/webm";
+    const ext = mime.includes("mp4") ? "m4a" : "webm";
+    const bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+    const path = `${event.id}/${crypto.randomUUID()}.${ext}`;
+
+    const { error: upErr } = await sb.storage.from("audio-memories").upload(path, bytes, {
+      contentType: mime, upsert: false,
+    });
+    if (upErr) throw new Error(upErr.message);
+
+    const { error, data: row } = await sb.from("memories").insert({
+      event_id: event.id,
+      guest_id: data.guestId,
+      guest_name: data.guestName,
+      type: "voice",
+      audio_url: path,
+    }).select("id").single();
+    if (error) throw new Error(error.message);
+    return { id: row.id };
+  });
+
+// PUBLIC: Submit note
+export const submitNote = createServerFn({ method: "POST" })
+  .inputValidator((d: { slug: string; guestId: string; guestName: string; content: string }) =>
+    z.object({
+      slug: z.string().min(1),
+      guestId: z.string().uuid(),
+      guestName: z.string().min(1).max(60),
+      content: z.string().min(1).max(500),
+    }).parse(d),
+  )
+  .handler(async ({ data }) => {
+    const sb = publicClient();
+    const { data: event } = await sb.from("events").select("id, is_active").eq("slug", data.slug).maybeSingle();
+    if (!event || !event.is_active) throw new Error("Event not available");
+    const { error, data: row } = await sb.from("memories").insert({
+      event_id: event.id,
+      guest_id: data.guestId,
+      guest_name: data.guestName,
+      type: "note",
+      content: data.content,
+    }).select("id").single();
+    if (error) throw new Error(error.message);
+    return { id: row.id };
+  });
+
+// PUBLIC: List album (enforces reveal time + signed URLs)
+export const listAlbum = createServerFn({ method: "GET" })
+  .inputValidator((d: { slug: string }) => z.object({ slug: z.string().min(1) }).parse(d))
+  .handler(async ({ data }) => {
+    const sb = publicClient();
+    const { data: event } = await sb.from("events")
+      .select("id, is_active, reveal_at").eq("slug", data.slug).maybeSingle();
+    if (!event || !event.is_active) return { revealed: false, revealAt: null, items: [] as PhotoItem[] };
+    const revealed = !event.reveal_at || new Date(event.reveal_at) <= new Date();
+    if (!revealed) return { revealed: false, revealAt: event.reveal_at, items: [] };
+
+    const { data: rows, error } = await sb.from("photos")
+      .select("id, guest_name, storage_url, filter_applied, created_at")
+      .eq("event_id", event.id).order("created_at", { ascending: false }).limit(500);
+    if (error) throw new Error(error.message);
+
+    const items: PhotoItem[] = await Promise.all((rows ?? []).map(async (r) => {
+      const { data: s } = await sb.storage.from("photos").createSignedUrl(r.storage_url, 60 * 60);
+      return { ...r, signed_url: s?.signedUrl ?? "" };
+    }));
+    return { revealed: true, revealAt: event.reveal_at, items };
+  });
+
+export type PhotoItem = {
+  id: string;
+  guest_name: string;
+  storage_url: string;
+  filter_applied: string | null;
+  created_at: string;
+  signed_url: string;
+};
+
+// PUBLIC: List notes + voice
+export const listMemories = createServerFn({ method: "GET" })
+  .inputValidator((d: { slug: string }) => z.object({ slug: z.string().min(1) }).parse(d))
+  .handler(async ({ data }) => {
+    const sb = publicClient();
+    const { data: event } = await sb.from("events")
+      .select("id, is_active, reveal_at").eq("slug", data.slug).maybeSingle();
+    if (!event || !event.is_active) return { revealed: false, notes: [], voices: [] };
+    const revealed = !event.reveal_at || new Date(event.reveal_at) <= new Date();
+    if (!revealed) return { revealed: false, notes: [], voices: [] };
+
+    const { data: rows, error } = await sb.from("memories")
+      .select("id, guest_name, type, content, audio_url, created_at")
+      .eq("event_id", event.id).order("created_at", { ascending: false }).limit(500);
+    if (error) throw new Error(error.message);
+
+    const notes = (rows ?? []).filter((r) => r.type === "note").map((r) => ({
+      id: r.id, guest_name: r.guest_name, content: r.content ?? "", created_at: r.created_at,
+    }));
+    const voicesRaw = (rows ?? []).filter((r) => r.type === "voice");
+    const voices = await Promise.all(voicesRaw.map(async (r) => {
+      const { data: s } = r.audio_url
+        ? await sb.storage.from("audio-memories").createSignedUrl(r.audio_url, 60 * 60)
+        : { data: null };
+      return { id: r.id, guest_name: r.guest_name, audio_url: r.audio_url ?? "", signed_url: s?.signedUrl ?? "", created_at: r.created_at };
+    }));
+    return { revealed: true, notes, voices };
+  });
+
+// AUTHED: My events
+export const listMyEvents = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { data, error } = await context.supabase
+      .from("events").select("id, slug, title, event_type, date, venue, is_active, created_at")
+      .eq("host_id", context.userId).order("created_at", { ascending: false });
+    if (error) throw new Error(error.message);
+
+    // counts
+    const ids = (data ?? []).map((e) => e.id);
+    const counts: Record<string, { guests: number; photos: number; notes: number; voices: number }> = {};
+    for (const id of ids) counts[id] = { guests: 0, photos: 0, notes: 0, voices: 0 };
+    if (ids.length) {
+      const [g, p, m] = await Promise.all([
+        context.supabase.from("guests").select("event_id", { count: "exact", head: false }).in("event_id", ids),
+        context.supabase.from("photos").select("event_id", { count: "exact", head: false }).in("event_id", ids),
+        context.supabase.from("memories").select("event_id, type").in("event_id", ids),
+      ]);
+      g.data?.forEach((r) => counts[r.event_id].guests++);
+      p.data?.forEach((r) => counts[r.event_id].photos++);
+      m.data?.forEach((r) => { if (r.type === "note") counts[r.event_id].notes++; else counts[r.event_id].voices++; });
+    }
+
+    return (data ?? []).map((e) => ({ ...e, counts: counts[e.id] }));
+  });
+
+// AUTHED: my host status
+export const getMyHostStatus = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const [{ data: host }, { data: roles }] = await Promise.all([
+      context.supabase.from("hosts").select("status, email").eq("user_id", context.userId).maybeSingle(),
+      context.supabase.from("user_roles").select("role").eq("user_id", context.userId),
+    ]);
+    return {
+      status: host?.status ?? "pending",
+      email: host?.email ?? null,
+      isAdmin: (roles ?? []).some((r) => r.role === "admin"),
+    };
+  });
+
+// AUTHED: Create event
+export const createEvent = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: {
+    title: string; slug: string; eventType: string; date: string | null;
+    venue: string | null; welcomeMessage: string | null; revealAt: string | null;
+    coverDataUrl: string | null; invitationDataUrl: string | null;
+  }) => z.object({
+    title: z.string().min(1).max(120),
+    slug: z.string().min(3).max(60).regex(/^[a-z0-9-]+$/),
+    eventType: z.enum(["wedding", "birthday", "party", "travel", "ceremony"]),
+    date: z.string().nullable(),
+    venue: z.string().max(200).nullable(),
+    welcomeMessage: z.string().max(500).nullable(),
+    revealAt: z.string().nullable(),
+    coverDataUrl: z.string().nullable(),
+    invitationDataUrl: z.string().nullable(),
+  }).parse(d))
+  .handler(async ({ data, context }) => {
+    const { data: event, error } = await context.supabase.from("events").insert({
+      host_id: context.userId,
+      slug: data.slug,
+      title: data.title,
+      event_type: data.eventType,
+      date: data.date,
+      venue: data.venue,
+      welcome_message: data.welcomeMessage,
+      reveal_at: data.revealAt,
+      is_active: true,
+    }).select("id, slug").single();
+    if (error) throw new Error(error.message);
+
+    const updates: { cover_image_url?: string; invitation_image_url?: string } = {};
+    if (data.coverDataUrl) updates.cover_image_url = await uploadDataUrl(context.supabase, "event-covers", event.id, data.coverDataUrl);
+    if (data.invitationDataUrl) updates.invitation_image_url = await uploadDataUrl(context.supabase, "event-invitations", event.id, data.invitationDataUrl);
+    if (Object.keys(updates).length) {
+      await context.supabase.from("events").update(updates).eq("id", event.id);
+    }
+    return event;
+  });
+
+async function uploadDataUrl(
+  sb: { storage: { from: (b: string) => { upload: (p: string, body: Uint8Array, opts: { contentType: string; upsert: boolean }) => Promise<{ error: { message: string } | null }> } } },
+  bucket: string,
+  eventId: string,
+  dataUrl: string,
+) {
+  const [meta, b64] = dataUrl.split(",");
+  const mime = meta.match(/data:(.*?);base64/)?.[1] ?? "image/jpeg";
+  const ext = mime.includes("png") ? "png" : mime.includes("webp") ? "webp" : "jpg";
+  const bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+  const path = `${eventId}/${crypto.randomUUID()}.${ext}`;
+  const { error } = await sb.storage.from(bucket).upload(path, bytes, { contentType: mime, upsert: false });
+  if (error) throw new Error(error.message);
+  return path;
+}
+
+// AUTHED: Get event detail for host (with signed URLs, full media list)
+export const getEventForHost = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { id: string }) => z.object({ id: z.string().uuid() }).parse(d))
+  .handler(async ({ data, context }) => {
+    const { data: event, error } = await context.supabase
+      .from("events").select("*").eq("id", data.id).maybeSingle();
+    if (error) throw new Error(error.message);
+    if (!event) throw new Error("Not found");
+
+    const [guestRes, photoRes, memRes] = await Promise.all([
+      context.supabase.from("guests").select("id, name, created_at").eq("event_id", event.id).order("created_at", { ascending: false }),
+      context.supabase.from("photos").select("id, guest_name, storage_url, filter_applied, created_at").eq("event_id", event.id).order("created_at", { ascending: false }),
+      context.supabase.from("memories").select("id, guest_name, type, content, audio_url, created_at").eq("event_id", event.id).order("created_at", { ascending: false }),
+    ]);
+    if (guestRes.error) throw new Error(guestRes.error.message);
+    if (photoRes.error) throw new Error(photoRes.error.message);
+    if (memRes.error) throw new Error(memRes.error.message);
+
+    let coverUrl: string | null = null;
+    let inviteUrl: string | null = null;
+    if (event.cover_image_url) {
+      const { data: s } = await context.supabase.storage.from("event-covers").createSignedUrl(event.cover_image_url, 60 * 60);
+      coverUrl = s?.signedUrl ?? null;
+    }
+    if (event.invitation_image_url) {
+      const { data: s } = await context.supabase.storage.from("event-invitations").createSignedUrl(event.invitation_image_url, 60 * 60);
+      inviteUrl = s?.signedUrl ?? null;
+    }
+    const photos = await Promise.all((photoRes.data ?? []).map(async (p) => {
+      const { data: s } = await context.supabase.storage.from("photos").createSignedUrl(p.storage_url, 60 * 60);
+      return { ...p, signed_url: s?.signedUrl ?? "" };
+    }));
+    const voices = await Promise.all((memRes.data ?? []).filter((m) => m.type === "voice").map(async (m) => {
+      const { data: s } = m.audio_url
+        ? await context.supabase.storage.from("audio-memories").createSignedUrl(m.audio_url, 60 * 60)
+        : { data: null };
+      return { id: m.id, guest_name: m.guest_name, audio_url: m.audio_url, signed_url: s?.signedUrl ?? "", created_at: m.created_at };
+    }));
+    const notes = (memRes.data ?? []).filter((m) => m.type === "note").map((m) => ({
+      id: m.id, guest_name: m.guest_name, content: m.content ?? "", created_at: m.created_at,
+    }));
+
+    return {
+      event: { ...event, cover_signed_url: coverUrl, invitation_signed_url: inviteUrl },
+      guests: guestRes.data ?? [],
+      photos, notes, voices,
+    };
+  });
+
+export const toggleEventActive = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { id: string; isActive: boolean }) =>
+    z.object({ id: z.string().uuid(), isActive: z.boolean() }).parse(d))
+  .handler(async ({ data, context }) => {
+    const { error } = await context.supabase.from("events").update({ is_active: data.isActive }).eq("id", data.id);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+export const updateEventInvitation = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { id: string; dataUrl: string }) =>
+    z.object({ id: z.string().uuid(), dataUrl: z.string().startsWith("data:image/").max(20_000_000) }).parse(d))
+  .handler(async ({ data, context }) => {
+    const path = await uploadDataUrl(context.supabase, "event-invitations", data.id, data.dataUrl);
+    const { error } = await context.supabase.from("events").update({ invitation_image_url: path }).eq("id", data.id);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+export const deletePhoto = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { id: string }) => z.object({ id: z.string().uuid() }).parse(d))
+  .handler(async ({ data, context }) => {
+    const { data: row } = await context.supabase.from("photos").select("storage_url").eq("id", data.id).maybeSingle();
+    if (row?.storage_url) await context.supabase.storage.from("photos").remove([row.storage_url]);
+    const { error } = await context.supabase.from("photos").delete().eq("id", data.id);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+export const deleteMemory = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { id: string }) => z.object({ id: z.string().uuid() }).parse(d))
+  .handler(async ({ data, context }) => {
+    const { data: row } = await context.supabase.from("memories").select("audio_url").eq("id", data.id).maybeSingle();
+    if (row?.audio_url) await context.supabase.storage.from("audio-memories").remove([row.audio_url]);
+    const { error } = await context.supabase.from("memories").delete().eq("id", data.id);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+// ADMIN
+async function requireAdmin(context: { supabase: ReturnType<typeof publicClient>; userId: string }) {
+  const { data } = await context.supabase.from("user_roles").select("role").eq("user_id", context.userId).eq("role", "admin").maybeSingle();
+  if (!data) throw new Error("Forbidden");
+}
+
+export const listHosts = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    await requireAdmin(context);
+    const { data, error } = await context.supabase.from("hosts")
+      .select("user_id, email, status, created_at").order("created_at", { ascending: false });
+    if (error) throw new Error(error.message);
+    return data ?? [];
+  });
+
+export const setHostStatus = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { userId: string; status: "pending" | "approved" | "suspended" }) =>
+    z.object({ userId: z.string().uuid(), status: z.enum(["pending", "approved", "suspended"]) }).parse(d))
+  .handler(async ({ data, context }) => {
+    await requireAdmin(context);
+    const { error } = await context.supabase.from("hosts").update({ status: data.status }).eq("user_id", data.userId);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+export const deleteHost = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { userId: string }) => z.object({ userId: z.string().uuid() }).parse(d))
+  .handler(async ({ data, context }) => {
+    await requireAdmin(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { error } = await supabaseAdmin.auth.admin.deleteUser(data.userId);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+export const listAllEvents = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    await requireAdmin(context);
+    const { data: events, error } = await context.supabase.from("events")
+      .select("id, slug, title, event_type, date, venue, is_active, host_id, created_at")
+      .order("created_at", { ascending: false });
+    if (error) throw new Error(error.message);
+    const { data: hosts } = await context.supabase.from("hosts").select("user_id, email");
+    const hostMap = new Map((hosts ?? []).map((h) => [h.user_id, h.email]));
+    return (events ?? []).map((e) => ({ ...e, host_email: hostMap.get(e.host_id) ?? null }));
+  });
+
+export const listAllGuests = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    await requireAdmin(context);
+    const { data, error } = await context.supabase.from("guests")
+      .select("id, name, created_at, event_id, events(title, slug)")
+      .order("created_at", { ascending: false }).limit(500);
+    if (error) throw new Error(error.message);
+    return data ?? [];
+  });
