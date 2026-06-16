@@ -74,25 +74,34 @@
 }
 
 .dark {
-  --background: oklch(0.22 0.02 60);
-  --foreground: oklch(0.96 0.018 80);
-  --card: oklch(0.26 0.02 60);
-  --card-foreground: oklch(0.96 0.018 80);
-  --popover: oklch(0.26 0.02 60);
-  --popover-foreground: oklch(0.96 0.018 80);
-  --primary: oklch(0.78 0.1 20);
+  /* Remap brand tokens so existing text-ink / bg-cream / bg-cream-deep /
+     text-gold / bg-gold-soft utilities work in dark mode without rewrites. */
+  --cream: oklch(0.22 0.02 60);
+  --cream-deep: oklch(0.27 0.02 60);
+  --ink: oklch(0.96 0.018 80);
+  --gold: oklch(0.82 0.13 82);
+  --gold-soft: oklch(0.36 0.06 75);
+  --rose: oklch(0.78 0.08 22);
+
+  --background: var(--cream);
+  --foreground: var(--ink);
+  --card: oklch(0.27 0.02 60);
+  --card-foreground: var(--ink);
+  --popover: oklch(0.27 0.02 60);
+  --popover-foreground: var(--ink);
+  --primary: oklch(0.92 0.04 80);
   --primary-foreground: oklch(0.22 0.02 60);
-  --secondary: oklch(0.3 0.02 60);
-  --secondary-foreground: oklch(0.96 0.018 80);
+  --secondary: oklch(0.32 0.02 60);
+  --secondary-foreground: var(--ink);
   --muted: oklch(0.3 0.02 60);
-  --muted-foreground: oklch(0.72 0.03 70);
-  --accent: oklch(0.32 0.04 70);
-  --accent-foreground: oklch(0.96 0.018 80);
+  --muted-foreground: oklch(0.78 0.025 75);
+  --accent: var(--gold-soft);
+  --accent-foreground: var(--ink);
   --destructive: oklch(0.7 0.19 22);
   --destructive-foreground: oklch(0.98 0.005 80);
-  --border: oklch(1 0 0 / 10%);
+  --border: oklch(1 0 0 / 12%);
   --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.78 0.1 20);
+  --ring: var(--gold);
 }
 
 @layer base {
