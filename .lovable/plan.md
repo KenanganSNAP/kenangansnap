@@ -1,43 +1,89 @@
-# Plan
+# Plan — Phase 1: Core Admin CMS
 
-## 1. Admin can promote another user to admin
-- Add server fn `grantAdminByEmail({ email })` in `src/lib/kenangan.functions.ts`:
-  - Guarded by `requireSupabaseAuth` + `has_role(admin)` check.
-  - Looks up user via `supabaseAdmin.auth.admin` listUsers, then inserts into `user_roles (user_id, role='admin')` (ignore conflict).
-  - Also adds revoke variant `revokeAdmin({ userId })`.
-- Add a new "Admins" section on `/admin` (hosts page) with:
-  - Input + "Make admin" button.
-  - List of current admins with a "Revoke" button (cannot revoke self).
+Building sections **1, 6, 8** first using **simple structured fields** stored in the existing `site_settings` (jsonb) table. After Phase 1 ships and you confirm, I'll plan Phase 2 (guest-facing: templates, print, dark mode + i18n).
 
-## 2. Admin delete controls
-- Add server fns `adminDeleteEvent({ eventId })` and `adminDeleteGuest({ guestId })` (admin-only). Event delete cascades photos/memories/guests via FK or explicit cleanup.
-- `src/routes/_authenticated.admin.events.tsx`: add red "Delete" button per row (with confirm).
-- `src/routes/_authenticated.admin.guests.tsx`: add "Delete" button per row.
-- `src/routes/_authenticated.admin.media.tsx`: already has delete — verify it works; no change unless missing.
+## Section 1 — Public pages + admin-editable content
 
-## 3. Signup "Back" button
-- In `src/routes/auth.tsx`, when `mode === "signup"` show a back arrow at top-left of the card that returns to `signin`. Also add a top-level "← Back to home" link above the card on both modes.
+Three new public routes, each driven by a `site_settings` row:
 
-## 4. Host login after signup
-- Current `handle_new_user()` trigger creates hosts with status `pending`; nothing in the app blocks login, but to make the flow obvious change new-host default to `approved` (admin can suspend later from the admin panel).
-- Migration: alter `handle_new_user()` so non-admin signups get `status='approved'`.
-- Confirm `/dashboard` does not gate by status (it doesn't currently). After signup the user can immediately sign in with email+password (auto-confirm email is already on).
+- `/pricing` — reads `site_settings` key `pricing_page`
+- `/how-it-works` — reads key `how_it_works_page`
+- `/about` — reads key `about_page`
 
-## 5. Admin-editable homepage
-- New table `public.site_settings` (singleton row, key `homepage`) storing JSON: `hero_eyebrow`, `hero_title_line1`, `hero_title_line2`, `hero_subtitle`, `cta_primary`, `cta_secondary`, `section_title`, `section_subtitle`, `features[4]{title,body}`, `footer_note`.
-  - RLS: public SELECT (anon+authenticated), admin-only UPDATE via `has_role`.
-  - Seeded with current copy.
-- Server fns: `getHomepageSettings()` (public via server publishable client) and `updateHomepageSettings({ settings })` (admin-only).
-- New route `src/routes/_authenticated.admin.homepage.tsx` with a form for every field + Save.
-- Add "Homepage" tab to admin nav in `_authenticated.admin.tsx`.
-- `src/routes/index.tsx` loads settings via loader → `useSuspenseQuery` and renders dynamic copy (falls back to current defaults if fetch fails).
+Each page uses structured fields (no block editor): hero title/subtitle/image, a list of items (tiers / steps / team members), and a closing CTA. Public routes use the server publishable client with the existing anon `SELECT` policy on `site_settings`.
 
-## Technical notes
-- All admin fns: `.middleware([requireSupabaseAuth])` + verify `has_role(userId,'admin')` then dynamic-import `supabaseAdmin` only where needed (user lookup, cross-user role grants).
-- Homepage public read uses the publishable server client per `tanstack-supabase-integration` (narrow `TO anon` SELECT policy on `site_settings`).
-- Admin homepage route stays under `_authenticated/admin/*` (already gated).
+Admin editors live at:
+- `/admin/pages/pricing`
+- `/admin/pages/how-it-works`
+- `/admin/pages/about`
 
-## Files
-- new: `src/routes/_authenticated.admin.homepage.tsx`
-- edit: `src/lib/kenangan.functions.ts`, `src/routes/_authenticated.admin.tsx`, `src/routes/_authenticated.admin.index.tsx`, `src/routes/_authenticated.admin.events.tsx`, `src/routes/_authenticated.admin.guests.tsx`, `src/routes/auth.tsx`, `src/routes/index.tsx`
-- migrations: alter `handle_new_user()`, create `site_settings` table + RLS + seed
+Each editor is a simple form: text inputs, textareas, image uploads (to existing `event-covers` bucket under a `site/` prefix, or new `site-assets` bucket if you prefer), and add/remove/reorder buttons for the item list. Saves go through a `requireSupabaseAuth` server fn that checks `has_role(admin)` and upserts the row.
+
+Navigation: add Pricing, How It Works, About links to the public header on `/` (and shared landing layout).
+
+## Section 6 — Admin homepage content management
+
+Already has `/admin/homepage` — extend it (and create the matching `site_settings` keys + a `homepage_media` table) to manage:
+
+- **Featured photos**: gallery with reorder + delete + "set as hero" flag. New table `homepage_media (id, kind, url, sort_order, is_hero, caption)`.
+- **Featured video**: single field on `site_settings.homepage` — either an uploaded video URL or a YouTube/Vimeo embed URL. Auto-detect and render `<iframe>` for YT/Vimeo, `<video>` otherwise.
+- **Testimonials**: new table `testimonials (id, author_name, author_photo_url, quote, event_name, sort_order)`.
+
+Homepage (`/`) reads these via the server publishable client (anon `SELECT` policies) and renders them in existing sections, replacing the current placeholder content.
+
+## Section 8 — Admin event overview + editing + audit trail
+
+Extend `/admin/events`:
+
+- Detail view route `/admin/events/$id` showing all event fields, host info, guest count, photo/memory counts.
+- Edit form covering every column on `events` (title, type, date, venue, welcome message, cover image, invitation image, reveal_at, is_active).
+- Status control: add `status text` column to `events` with values `draft | active | completed | cancelled`. Existing `is_active` stays for backwards compatibility (kept in sync: `active` → true, others → false). Default `active`.
+- Audit trail: new table `event_audits (id, event_id, edited_by, edited_at, changed_fields jsonb, note text)`. Every admin-side update inserts a row. Hosts viewing their event in `/dashboard/event/$id` see a banner: "Edited by Admin on {date}" with an expandable list of changed fields.
+
+Server fns:
+- `adminUpdateEvent` (`requireSupabaseAuth` + admin role check) — updates event and writes audit row in one transaction (RPC).
+- `getEventAudits` — host or admin can read audits for events they own / all events.
+
+## Technical details
+
+### New tables (all in one migration, with GRANTs + RLS)
+
+```text
+homepage_media(id, kind, url, sort_order, is_hero, caption, created_at, updated_at)
+testimonials(id, author_name, author_photo_url, quote, event_name, sort_order, created_at, updated_at)
+event_audits(id, event_id → events, edited_by → auth.users, changed_fields jsonb, note, created_at)
+events.status text not null default 'active' check (status in ('draft','active','completed','cancelled'))
+```
+
+### RLS
+
+- `homepage_media`, `testimonials`: anon + authenticated SELECT; admin-only INSERT/UPDATE/DELETE via `has_role`.
+- `event_audits`: admin INSERT/SELECT; hosts SELECT only rows for events where `host_id = auth.uid()`.
+- `site_settings`: already correct; reuse keys `pricing_page`, `how_it_works_page`, `about_page`, `homepage`.
+
+### `site_settings` JSON shapes (simple structured fields)
+
+```text
+pricing_page:    { hero:{title,subtitle,image}, tiers:[{name,price,period,features[],cta}], footer_note }
+how_it_works:    { hero:{...}, steps:[{title,body,image}], cta:{label,href} }
+about_page:      { hero:{...}, mission, team:[{name,role,photo,bio}], cta }
+homepage:        { hero_title, hero_subtitle, video_url, video_kind:'youtube'|'vimeo'|'upload' }
+```
+
+### Files to add
+
+- Migration: `supabase/migrations/<ts>_admin_cms_phase1.sql`
+- Public routes: `src/routes/pricing.tsx`, `how-it-works.tsx`, `about.tsx`
+- Admin routes: `src/routes/_authenticated.admin.pages.pricing.tsx`, `.how-it-works.tsx`, `.about.tsx`, `_authenticated.admin.events.$id.tsx`
+- Server fns: `src/lib/cms.functions.ts`, `src/lib/admin-events.functions.ts`
+- Components: `src/components/cms/PageEditor.tsx` (shared form), `src/components/cms/ListEditor.tsx` (add/remove/reorder)
+- Header update for public nav
+
+### Out of scope for Phase 1
+
+- Photo templates, print, dark mode, language toggle, admin-editable Create Event form, admin guest editing — all in Phase 2 plan after your go-ahead.
+- Rich-text/WYSIWYG (you chose simple structured fields).
+
+## Confirmation gate
+
+After Phase 1 is implemented and verified, I'll stop and ask before starting Phase 2 (sections 2, 3, 4, 5, 7).
