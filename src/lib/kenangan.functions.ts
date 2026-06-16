@@ -281,6 +281,7 @@ export const createEvent = createServerFn({ method: "POST" })
     title: string; slug: string; eventType: string; date: string | null;
     venue: string | null; welcomeMessage: string | null; revealAt: string | null;
     coverDataUrl: string | null; invitationDataUrl: string | null;
+    customData?: Record<string, string> | null;
   }) => z.object({
     title: z.string().min(1).max(120),
     slug: z.string().min(1).max(60).regex(/^[a-z0-9-]+$/),
@@ -291,6 +292,7 @@ export const createEvent = createServerFn({ method: "POST" })
     revealAt: z.string().nullable(),
     coverDataUrl: z.string().nullable(),
     invitationDataUrl: z.string().nullable(),
+    customData: z.record(z.string(), z.string().max(2000)).nullable().optional(),
   }).parse(d))
   .handler(async ({ data, context }) => {
     const { data: event, error } = await context.supabase.from("events").insert({
@@ -303,6 +305,7 @@ export const createEvent = createServerFn({ method: "POST" })
       welcome_message: data.welcomeMessage,
       reveal_at: data.revealAt,
       is_active: true,
+      custom_data: (data.customData ?? {}) as never,
     }).select("id, slug").single();
     if (error) throw new Error(error.message);
 

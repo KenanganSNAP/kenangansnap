@@ -309,3 +309,101 @@ export const updateHomepageExtras = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
     return { ok: true };
   });
+
+// ===== CREATE EVENT FORM CONFIG =====
+
+export type CreateEventFieldType = "text" | "textarea" | "date" | "datetime" | "select" | "image";
+export type CreateEventField = {
+  key: string;
+  label: string;
+  type: CreateEventFieldType;
+  required: boolean;
+  visible: boolean;
+  placeholder?: string;
+  helpText?: string;
+  options?: string[]; // for select
+  builtin: boolean;
+};
+export type CreateEventFormConfig = { fields: CreateEventField[] };
+
+export const BUILTIN_FIELD_KEYS = ["title", "slug", "eventType", "date", "venue", "welcomeMessage", "revealAt", "cover", "invitation"] as const;
+
+const createEventFormDefaults: CreateEventFormConfig = {
+  fields: [
+    { key: "title", label: "Event title", type: "text", required: true, visible: true, placeholder: "Aisha & Daniel", builtin: true },
+    { key: "slug", label: "Event web address", type: "text", required: false, visible: true, helpText: "Auto-generated from your title — ready to share.", builtin: true },
+    { key: "eventType", label: "Type", type: "select", required: true, visible: true, options: ["wedding", "birthday", "party", "travel", "ceremony"], builtin: true },
+    { key: "date", label: "Date", type: "date", required: false, visible: true, builtin: true },
+    { key: "venue", label: "Venue", type: "text", required: false, visible: true, placeholder: "KLCC Convention Centre", builtin: true },
+    { key: "welcomeMessage", label: "Welcome message", type: "textarea", required: false, visible: true, placeholder: "Bismillah — welcome to our special day…", builtin: true },
+    { key: "revealAt", label: "Reveal at (leave blank for instant reveal)", type: "datetime", required: false, visible: true, builtin: true },
+    { key: "cover", label: "Cover photo", type: "image", required: false, visible: true, builtin: true },
+    { key: "invitation", label: "Invitation image", type: "image", required: false, visible: true, builtin: true },
+  ],
+};
+
+export const getCreateEventForm = createServerFn({ method: "GET" })
+  .handler(async (): Promise<CreateEventFormConfig> => {
+    const sb = publicClient();
+    const { data } = await sb.from("site_settings").select("settings").eq("key", "create_event_form").maybeSingle();
+    const stored = (data?.settings as Partial<CreateEventFormConfig> | null);
+    if (!stored?.fields?.length) return createEventFormDefaults;
+    // Ensure every builtin still appears (admin can hide but not remove)
+    const byKey = new Map(stored.fields.map((f) => [f.key, f]));
+    const merged: CreateEventField[] = [];
+    for (const builtinKey of BUILTIN_FIELD_KEYS) {
+      const def = createEventFormDefaults.fields.find((f) => f.key === builtinKey)!;
+      const existing = byKey.get(builtinKey);
+      merged.push(existing ? { ...def, ...existing, builtin: true } : def);
+    }
+    for (const f of stored.fields) {
+      if (!BUILTIN_FIELD_KEYS.includes(f.key as typeof BUILTIN_FIELD_KEYS[number])) merged.push({ ...f, builtin: false });
+    }
+    // Preserve admin ordering when present
+    const order = stored.fields.map((f) => f.key);
+    merged.sort((a, b) => {
+      const ai = order.indexOf(a.key);
+      const bi = order.indexOf(b.key);
+      if (ai === -1 && bi === -1) return 0;
+      if (ai === -1) return 1;
+      if (bi === -1) return -1;
+      return ai - bi;
+    });
+    return { fields: merged };
+  });
+
+const fieldSchema = z.object({
+  key: z.string().min(1).max(40).regex(/^[a-zA-Z][a-zA-Z0-9_]*$/),
+  label: z.string().min(1).max(120),
+  type: z.enum(["text", "textarea", "date", "datetime", "select", "image"]),
+  required: z.boolean(),
+  visible: z.boolean(),
+  placeholder: z.string().max(160).optional(),
+  helpText: z.string().max(240).optional(),
+  options: z.array(z.string().min(1).max(60)).max(20).optional(),
+  builtin: z.boolean(),
+});
+
+export const updateCreateEventForm = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { config: CreateEventFormConfig }) =>
+    z.object({ config: z.object({ fields: z.array(fieldSchema).max(40) }) }).parse(d))
+  .handler(async ({ data, context }) => {
+    await requireAdmin(context);
+    // Builtins must all be present, and custom field keys must not collide with builtins
+    const builtins = new Set<string>(BUILTIN_FIELD_KEYS);
+    const seen = new Set<string>();
+    for (const f of data.config.fields) {
+      if (seen.has(f.key)) throw new Error(`Duplicate field key: ${f.key}`);
+      seen.add(f.key);
+      if (f.builtin && !builtins.has(f.key)) throw new Error(`Unknown builtin: ${f.key}`);
+      if (!f.builtin && builtins.has(f.key)) throw new Error(`Reserved key: ${f.key}`);
+    }
+    for (const k of BUILTIN_FIELD_KEYS) {
+      if (!seen.has(k)) throw new Error(`Missing builtin field: ${k}`);
+    }
+    const { error } = await context.supabase.from("site_settings")
+      .upsert({ key: "create_event_form", settings: data.config as unknown as Json, updated_at: new Date().toISOString(), updated_by: context.userId });
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });

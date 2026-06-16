@@ -1,7 +1,9 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
+import { useQuery } from "@tanstack/react-query";
 import { createEvent } from "@/lib/kenangan.functions";
+import { getCreateEventForm, type CreateEventField } from "@/lib/cms.functions";
 import { slugify } from "@/lib/slug";
 import { resizeImageToDataUrl } from "@/lib/image-resize";
 import { ArrowLeft, Upload, Pencil, Check } from "lucide-react";
@@ -16,6 +18,11 @@ export const Route = createFileRoute("/_authenticated/dashboard/create")({
 
 function CreateEvent() {
   const nav = useNavigate();
+  const { data: formConfig } = useQuery({
+    queryKey: ["create-event-form"],
+    queryFn: () => getCreateEventForm(),
+  });
+
   const [title, setTitle] = useState("");
   const [slug, setSlug] = useState("");
   const [slugTouched, setSlugTouched] = useState(false);
@@ -31,7 +38,16 @@ function CreateEvent() {
   const [revealAt, setRevealAt] = useState("");
   const [cover, setCover] = useState<string | null>(null);
   const [invitation, setInvitation] = useState<string | null>(null);
+  const [customValues, setCustomValues] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
+
+  // Default eventType to first option if config customised it
+  useEffect(() => {
+    const t = formConfig?.fields.find((f) => f.key === "eventType");
+    if (t?.options?.length && !t.options.includes(eventType)) {
+      setEventType(t.options[0] as typeof eventType);
+    }
+  }, [formConfig, eventType]);
 
   async function handleImage(file: File | undefined, setter: (s: string | null) => void) {
     if (!file) return;
@@ -39,10 +55,33 @@ function CreateEvent() {
     try { setter(await resizeImageToDataUrl(file)); } catch { toast.error("Could not read image"); }
   }
 
+  function valueFor(f: CreateEventField): string {
+    switch (f.key) {
+      case "title": return title;
+      case "venue": return venue;
+      case "welcomeMessage": return welcomeMessage;
+      case "date": return date;
+      case "revealAt": return revealAt;
+      case "eventType": return eventType;
+      default: return customValues[f.key] ?? "";
+    }
+  }
+
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setBusy(true);
     try {
+      // Required-field validation honours admin config
+      for (const f of formConfig?.fields ?? []) {
+        if (!f.visible || !f.required) continue;
+        if (f.type === "image") {
+          if (f.key === "cover" && !cover) throw new Error(`${f.label} is required`);
+          if (f.key === "invitation" && !invitation) throw new Error(`${f.label} is required`);
+          continue;
+        }
+        const v = valueFor(f).trim();
+        if (!v) throw new Error(`${f.label} is required`);
+      }
       const finalSlug = effectiveSlug || slugify(title);
       const event = await createEvent({
         data: {
@@ -51,6 +90,7 @@ function CreateEvent() {
           welcomeMessage: welcomeMessage || null,
           revealAt: revealAt || null,
           coverDataUrl: cover, invitationDataUrl: invitation,
+          customData: Object.keys(customValues).length ? customValues : null,
         },
       });
       toast.success("Event created");
@@ -62,24 +102,21 @@ function CreateEvent() {
     }
   }
 
-  return (
-    <div className="mx-auto max-w-2xl py-4">
-      <Link to="/dashboard" className="inline-flex items-center gap-1 text-sm text-ink/70 hover:text-ink">
-        <ArrowLeft size={14} /> Back
-      </Link>
-      <h1 className="mt-4 font-serif text-4xl italic">Create event</h1>
-      <p className="mt-1 text-ink/65">A single QR code becomes your guests' way in.</p>
-
-      <form onSubmit={submit} className="mt-8 space-y-4 rounded-3xl border border-ink/10 bg-card p-6">
-        <Field label="Event title">
-          <input
-            required value={title}
+  function renderField(f: CreateEventField) {
+    if (!f.visible) return null;
+    if (f.key === "title") {
+      return (
+        <Field key={f.key} label={labelFor(f)}>
+          <input required={f.required} value={title}
             onChange={(e) => setTitle(e.target.value)}
-            className="w-full rounded-xl border border-ink/15 bg-cream/70 px-4 py-2.5 outline-none focus:border-gold"
-            placeholder="Aisha & Daniel"
-          />
+            className="w-full rounded-xl border border-ink/15 bg-cream/70 px-4 py-2.5 text-ink outline-none focus:border-gold"
+            placeholder={f.placeholder ?? ""} />
         </Field>
-        <Field label="Event web address (optional)">
+      );
+    }
+    if (f.key === "slug") {
+      return (
+        <Field key={f.key} label={labelFor(f)}>
           <div className="rounded-xl border border-ink/15 bg-cream/70 px-4 py-3">
             <div className="break-all font-mono text-sm text-ink/80">
               <span className="text-ink/50">{origin}/event/</span>
@@ -103,45 +140,134 @@ function CreateEvent() {
                 </button>
               </div>
             )}
-            <p className="mt-1 text-[11px] text-ink/55">Auto-generated from your title — ready to share.</p>
+            {f.helpText && <p className="mt-1 text-[11px] text-ink/55">{f.helpText}</p>}
           </div>
         </Field>
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Type">
-            <select value={eventType} onChange={(e) => setEventType(e.target.value as typeof eventType)}
-              className="w-full rounded-xl border border-ink/15 bg-cream/70 px-4 py-2.5 outline-none">
-              <option value="wedding">Wedding</option>
-              <option value="birthday">Birthday</option>
-              <option value="party">Party</option>
-              <option value="travel">Travel</option>
-              <option value="ceremony">Ceremony</option>
-            </select>
-          </Field>
-          <Field label="Date">
-            <input type="date" value={date} onChange={(e) => setDate(e.target.value)}
-              className="w-full rounded-xl border border-ink/15 bg-cream/70 px-4 py-2.5 outline-none" />
-          </Field>
-        </div>
-        <Field label="Venue">
-          <input value={venue} onChange={(e) => setVenue(e.target.value)}
-            className="w-full rounded-xl border border-ink/15 bg-cream/70 px-4 py-2.5 outline-none"
-            placeholder="KLCC Convention Centre" />
+      );
+    }
+    if (f.key === "eventType") {
+      const opts = f.options ?? ["wedding", "birthday", "party", "travel", "ceremony"];
+      return (
+        <Field key={f.key} label={labelFor(f)}>
+          <select value={eventType} onChange={(e) => setEventType(e.target.value as typeof eventType)}
+            className="w-full rounded-xl border border-ink/15 bg-cream/70 px-4 py-2.5 text-ink outline-none">
+            {opts.map((o) => <option key={o} value={o}>{o[0].toUpperCase() + o.slice(1)}</option>)}
+          </select>
         </Field>
-        <Field label="Welcome message (optional)">
-          <textarea value={welcomeMessage} onChange={(e) => setWelcomeMessage(e.target.value)}
-            rows={3}
-            className="w-full rounded-xl border border-ink/15 bg-cream/70 px-4 py-2.5 outline-none"
-            placeholder="Bismillah — welcome to our special day…" />
+      );
+    }
+    if (f.key === "date") {
+      return (
+        <Field key={f.key} label={labelFor(f)}>
+          <input type="date" required={f.required} value={date} onChange={(e) => setDate(e.target.value)}
+            className="w-full rounded-xl border border-ink/15 bg-cream/70 px-4 py-2.5 text-ink outline-none" />
         </Field>
-        <Field label="Reveal at (optional — leave blank for instant reveal)">
+      );
+    }
+    if (f.key === "venue") {
+      return (
+        <Field key={f.key} label={labelFor(f)}>
+          <input required={f.required} value={venue} onChange={(e) => setVenue(e.target.value)}
+            className="w-full rounded-xl border border-ink/15 bg-cream/70 px-4 py-2.5 text-ink outline-none"
+            placeholder={f.placeholder ?? ""} />
+        </Field>
+      );
+    }
+    if (f.key === "welcomeMessage") {
+      return (
+        <Field key={f.key} label={labelFor(f)}>
+          <textarea required={f.required} value={welcomeMessage} onChange={(e) => setWelcomeMessage(e.target.value)} rows={3}
+            className="w-full rounded-xl border border-ink/15 bg-cream/70 px-4 py-2.5 text-ink outline-none"
+            placeholder={f.placeholder ?? ""} />
+        </Field>
+      );
+    }
+    if (f.key === "revealAt") {
+      return (
+        <Field key={f.key} label={labelFor(f)}>
           <input type="datetime-local" value={revealAt} onChange={(e) => setRevealAt(e.target.value)}
-            className="w-full rounded-xl border border-ink/15 bg-cream/70 px-4 py-2.5 outline-none" />
+            className="w-full rounded-xl border border-ink/15 bg-cream/70 px-4 py-2.5 text-ink outline-none" />
         </Field>
+      );
+    }
+    if (f.key === "cover") {
+      return <ImageField key={f.key} label={labelFor(f)} value={cover} onChange={(file) => handleImage(file, setCover)} />;
+    }
+    if (f.key === "invitation") {
+      return <ImageField key={f.key} label={labelFor(f)} value={invitation} onChange={(file) => handleImage(file, setInvitation)} />;
+    }
+    // Custom (admin-defined) field
+    const v = customValues[f.key] ?? "";
+    const setV = (val: string) => setCustomValues((c) => ({ ...c, [f.key]: val }));
+    if (f.type === "textarea") {
+      return (
+        <Field key={f.key} label={labelFor(f)} help={f.helpText}>
+          <textarea required={f.required} value={v} onChange={(e) => setV(e.target.value)} rows={3}
+            className="w-full rounded-xl border border-ink/15 bg-cream/70 px-4 py-2.5 text-ink outline-none"
+            placeholder={f.placeholder ?? ""} />
+        </Field>
+      );
+    }
+    if (f.type === "select") {
+      return (
+        <Field key={f.key} label={labelFor(f)} help={f.helpText}>
+          <select required={f.required} value={v} onChange={(e) => setV(e.target.value)}
+            className="w-full rounded-xl border border-ink/15 bg-cream/70 px-4 py-2.5 text-ink outline-none">
+            <option value="">Select…</option>
+            {(f.options ?? []).map((o) => <option key={o} value={o}>{o}</option>)}
+          </select>
+        </Field>
+      );
+    }
+    if (f.type === "date" || f.type === "datetime") {
+      return (
+        <Field key={f.key} label={labelFor(f)} help={f.helpText}>
+          <input type={f.type === "date" ? "date" : "datetime-local"} required={f.required}
+            value={v} onChange={(e) => setV(e.target.value)}
+            className="w-full rounded-xl border border-ink/15 bg-cream/70 px-4 py-2.5 text-ink outline-none" />
+        </Field>
+      );
+    }
+    if (f.type === "image") {
+      // Custom image fields are stored as data URLs in custom_data (not uploaded).
+      return (
+        <Field key={f.key} label={labelFor(f)} help={f.helpText}>
+          <input type="file" accept="image/*"
+            onChange={async (e) => {
+              const file = e.target.files?.[0];
+              if (!file) return;
+              try { setV(await resizeImageToDataUrl(file)); }
+              catch { toast.error("Could not read image"); }
+            }}
+            className="w-full text-sm text-ink/70" />
+          {v && <img src={v} alt="preview" className="mt-2 max-h-40 rounded-lg" />}
+        </Field>
+      );
+    }
+    // default: text
+    return (
+      <Field key={f.key} label={labelFor(f)} help={f.helpText}>
+        <input required={f.required} value={v} onChange={(e) => setV(e.target.value)}
+          className="w-full rounded-xl border border-ink/15 bg-cream/70 px-4 py-2.5 text-ink outline-none"
+          placeholder={f.placeholder ?? ""} />
+      </Field>
+    );
+  }
 
-        <div className="grid gap-4 sm:grid-cols-2">
-          <ImageField label="Cover photo" value={cover} onChange={(f) => handleImage(f, setCover)} />
-          <ImageField label="Invitation image" value={invitation} onChange={(f) => handleImage(f, setInvitation)} />
-        </div>
+  function labelFor(f: CreateEventField) {
+    return f.required ? `${f.label} *` : `${f.label}${f.key === "welcomeMessage" || f.key === "venue" || f.key === "revealAt" || f.key === "slug" ? "" : ""}`;
+  }
+
+  return (
+    <div className="mx-auto max-w-2xl py-4">
+      <Link to="/dashboard" className="inline-flex items-center gap-1 text-sm text-ink/70 hover:text-ink">
+        <ArrowLeft size={14} /> Back
+      </Link>
+      <h1 className="mt-4 font-serif text-4xl italic">Create event</h1>
+      <p className="mt-1 text-ink/65">A single QR code becomes your guests' way in.</p>
+
+      <form onSubmit={submit} className="mt-8 space-y-4 rounded-3xl border border-ink/10 bg-card p-6">
+        {(formConfig?.fields ?? []).map(renderField)}
 
         <button disabled={busy} type="submit"
           className="mt-2 w-full rounded-xl bg-ink py-3 text-sm tracking-wider text-cream disabled:opacity-60">
@@ -152,11 +278,12 @@ function CreateEvent() {
   );
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+function Field({ label, children, help }: { label: string; children: React.ReactNode; help?: string }) {
   return (
     <label className="block">
       <span className="text-xs uppercase tracking-wider text-ink/60">{label}</span>
       <div className="mt-1">{children}</div>
+      {help && <p className="mt-1 text-[11px] text-ink/55">{help}</p>}
     </label>
   );
 }
