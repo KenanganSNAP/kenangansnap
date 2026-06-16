@@ -43,7 +43,7 @@ function CreateEvent() {
     e.preventDefault();
     setBusy(true);
     try {
-      const finalSlug = slug || slugify(title);
+      const finalSlug = effectiveSlug || slugify(title);
       const event = await createEvent({
         data: {
           title, slug: finalSlug, eventType,
