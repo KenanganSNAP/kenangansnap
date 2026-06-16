@@ -4,7 +4,11 @@ import { toast } from "sonner";
 import { createEvent } from "@/lib/kenangan.functions";
 import { slugify } from "@/lib/slug";
 import { resizeImageToDataUrl } from "@/lib/image-resize";
-import { ArrowLeft, Upload } from "lucide-react";
+import { ArrowLeft, Upload, Pencil, Check } from "lucide-react";
+
+function randomSuffix() {
+  return Math.random().toString(36).slice(2, 5);
+}
 
 export const Route = createFileRoute("/_authenticated/dashboard/create")({
   component: CreateEvent,
