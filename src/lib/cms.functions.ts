@@ -12,7 +12,7 @@ function publicClient() {
   );
 }
 
-async function requireAdmin(context: { supabase: { from: (t: string) => { select: (c: string) => { eq: (k: string, v: string) => { eq: (k: string, v: string) => { maybeSingle: () => Promise<{ data: unknown }> } } } } }; userId: string }) {
+async function requireAdmin(context: { supabase: ReturnType<typeof publicClient>; userId: string }) {
   const { data } = await context.supabase.from("user_roles").select("role").eq("user_id", context.userId).eq("role", "admin").maybeSingle();
   if (!data) throw new Error("Forbidden");
 }
