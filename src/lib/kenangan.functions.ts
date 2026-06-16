@@ -283,7 +283,7 @@ export const createEvent = createServerFn({ method: "POST" })
     coverDataUrl: string | null; invitationDataUrl: string | null;
   }) => z.object({
     title: z.string().min(1).max(120),
-    slug: z.string().min(3).max(60).regex(/^[a-z0-9-]+$/),
+    slug: z.string().min(1).max(60).regex(/^[a-z0-9-]+$/),
     eventType: z.enum(["wedding", "birthday", "party", "travel", "ceremony"]),
     date: z.string().nullable(),
     venue: z.string().max(200).nullable(),
