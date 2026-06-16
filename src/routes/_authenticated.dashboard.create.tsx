@@ -74,15 +74,37 @@ function CreateEvent() {
         <Field label="Event title">
           <input
             required value={title}
-            onChange={(e) => { setTitle(e.target.value); if (!slug) setSlug(slugify(e.target.value)); }}
+            onChange={(e) => setTitle(e.target.value)}
             className="w-full rounded-xl border border-ink/15 bg-cream/70 px-4 py-2.5 outline-none focus:border-gold"
             placeholder="Aisha & Daniel"
           />
         </Field>
-        <Field label="URL slug">
-          <input required value={slug} onChange={(e) => setSlug(slugify(e.target.value))}
-            className="w-full rounded-xl border border-ink/15 bg-cream/70 px-4 py-2.5 font-mono text-sm outline-none focus:border-gold"
-            placeholder="aisha-daniel" />
+        <Field label="Event web address (optional)">
+          <div className="rounded-xl border border-ink/15 bg-cream/70 px-4 py-3">
+            <div className="break-all font-mono text-sm text-ink/80">
+              <span className="text-ink/50">{origin}/event/</span>
+              <span className="text-ink">{effectiveSlug || "your-event"}</span>
+            </div>
+            {!editingSlug ? (
+              <button type="button"
+                onClick={() => { if (!slugTouched) setSlug(effectiveSlug); setEditingSlug(true); }}
+                className="mt-2 inline-flex items-center gap-1 text-xs text-ink/70 hover:text-gold">
+                <Pencil size={12} /> Edit custom link
+              </button>
+            ) : (
+              <div className="mt-2 flex items-center gap-2">
+                <input value={slug}
+                  onChange={(e) => { setSlug(slugify(e.target.value)); setSlugTouched(true); }}
+                  className="flex-1 rounded-lg border border-ink/15 bg-white px-3 py-1.5 font-mono text-sm outline-none focus:border-gold"
+                  placeholder="aisha-daniel" />
+                <button type="button" onClick={() => setEditingSlug(false)}
+                  className="inline-flex items-center gap-1 rounded-lg bg-ink px-3 py-1.5 text-xs text-cream">
+                  <Check size={12} /> Done
+                </button>
+              </div>
+            )}
+            <p className="mt-1 text-[11px] text-ink/55">Auto-generated from your title — ready to share.</p>
+          </div>
         </Field>
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Type">
