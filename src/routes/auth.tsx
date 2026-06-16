@@ -46,8 +46,20 @@ function AuthPage() {
   return (
     <div className="grid min-h-screen place-items-center px-5 py-10">
       <div className="w-full max-w-md">
+        <div className="mb-4 flex justify-center">
+          <Link to="/" className="text-xs uppercase tracking-[0.3em] text-ink/60 hover:text-ink">← Back to home</Link>
+        </div>
         <Link to="/" className="mb-8 flex justify-center"><BrandMark /></Link>
         <div className="rounded-3xl border border-ink/10 bg-card/80 p-8 shadow-[0_30px_60px_-30px_rgba(40,25,15,0.4)] backdrop-blur">
+          {mode === "signup" && (
+            <button
+              type="button"
+              onClick={() => setMode("signin")}
+              className="mb-4 inline-flex items-center gap-1 text-xs uppercase tracking-[0.25em] text-ink/60 hover:text-ink"
+            >
+              ← Back to sign in
+            </button>
+          )}
           <div className="text-center">
             <div className="text-[10px] uppercase tracking-[0.35em] text-ink/60">Host portal</div>
             <h1 className="mt-2 font-serif text-3xl italic">
@@ -56,9 +68,10 @@ function AuthPage() {
             <p className="mt-1 text-sm text-ink/65">
               {mode === "signin"
                 ? "Sign in to manage your event memories."
-                : "New hosts are reviewed before going live."}
+                : "Sign up and you can log in straight away."}
             </p>
           </div>
+
 
           <form onSubmit={submit} className="mt-6 space-y-3">
             <label className="block">

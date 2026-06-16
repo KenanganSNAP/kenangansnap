@@ -211,6 +211,27 @@ export type Database = {
           },
         ]
       }
+      site_settings: {
+        Row: {
+          key: string
+          settings: Json
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          key: string
+          settings?: Json
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          key?: string
+          settings?: Json
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           created_at: string

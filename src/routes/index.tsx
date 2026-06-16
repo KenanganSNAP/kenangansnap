@@ -1,6 +1,15 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { useSuspenseQuery, queryOptions } from "@tanstack/react-query";
 import { Camera, Mic, MessageSquareHeart, QrCode, Download, Sparkles } from "lucide-react";
 import { BrandMark } from "@/components/brand-mark";
+import { getHomepageSettings } from "@/lib/kenangan.functions";
+
+const homepageQuery = queryOptions({
+  queryKey: ["homepage-public"],
+  queryFn: () => getHomepageSettings(),
+});
+
+const ICONS = [QrCode, Camera, Mic, MessageSquareHeart];
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -9,10 +18,12 @@ export const Route = createFileRoute("/")({
       { name: "description", content: "Hosts launch a private memory booth. Guests scan one QR to send photos, voice notes, and written messages — no app required." },
     ],
   }),
+  loader: ({ context }) => context.queryClient.ensureQueryData(homepageQuery),
   component: Landing,
 });
 
 function Landing() {
+  const { data: s } = useSuspenseQuery(homepageQuery);
   return (
     <div className="min-h-screen">
       <header className="mx-auto flex max-w-6xl items-center justify-between px-5 py-6">
@@ -30,28 +41,27 @@ function Landing() {
 
       <section className="mx-auto max-w-5xl px-5 pt-6 pb-20 text-center">
         <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-ink/10 bg-cream/70 px-4 py-1.5 text-[11px] uppercase tracking-[0.3em] text-ink/70">
-          <Sparkles size={14} /> A live memory booth
+          <Sparkles size={14} /> {s.hero_eyebrow}
         </div>
         <h1 className="font-serif text-5xl italic leading-[0.95] text-ink sm:text-7xl md:text-[5.5rem]">
-          Every guest. <br />
-          <span className="font-script text-gold sm:text-[6rem]">Every memory.</span>
+          {s.hero_title_line1} <br />
+          <span className="font-script text-gold sm:text-[6rem]">{s.hero_title_line2}</span>
         </h1>
         <p className="mx-auto mt-6 max-w-xl text-balance text-base text-ink/70 sm:text-lg">
-          One QR code at the door. Your guests send photos, voice notes, and heartfelt
-          messages straight to your private album — no app, no sign-ups.
+          {s.hero_subtitle}
         </p>
         <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
           <Link
             to="/auth"
             className="inline-flex items-center gap-2 rounded-full bg-ink px-6 py-3 text-sm tracking-wide text-cream shadow-[0_12px_30px_-12px_rgba(40,25,15,0.7)] transition hover:opacity-90"
           >
-            Start your event <span aria-hidden>→</span>
+            {s.cta_primary} <span aria-hidden>→</span>
           </Link>
           <a
             href="#how"
             className="inline-flex items-center gap-2 rounded-full border border-ink/15 bg-cream/60 px-6 py-3 text-sm text-ink transition hover:bg-cream"
           >
-            See how it works
+            {s.cta_secondary}
           </a>
         </div>
 
@@ -72,25 +82,23 @@ function Landing() {
       </section>
 
       <section id="how" className="mx-auto max-w-5xl px-5 py-16">
-        <h2 className="text-center font-serif text-3xl italic text-ink sm:text-4xl">A booth without a booth</h2>
+        <h2 className="text-center font-serif text-3xl italic text-ink sm:text-4xl">{s.section_title}</h2>
         <p className="mx-auto mt-3 max-w-xl text-center text-ink/65">
-          Four ways your guests can leave something behind — gathered into one elegant private album.
+          {s.section_subtitle}
         </p>
         <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {[
-            { icon: QrCode, title: "One QR", body: "Print it, frame it, project it. Guests scan and they're in." },
-            { icon: Camera, title: "Film photos", body: "Live camera with five tactile film filters — warm, fade, noir, golden, cinematic." },
-            { icon: Mic, title: "Voice notes", body: "Hold-to-record up to 60 seconds. The voice you remember, kept forever." },
-            { icon: MessageSquareHeart, title: "Written wishes", body: "A small page for the long messages — doa, jokes, secrets." },
-          ].map((f) => (
-            <div key={f.title} className="rounded-2xl border border-ink/10 bg-card p-5">
-              <div className="grid h-10 w-10 place-items-center rounded-xl bg-ink/90 text-cream">
-                <f.icon size={18} />
+          {s.features.map((f, i) => {
+            const Icon = ICONS[i] ?? Sparkles;
+            return (
+              <div key={i} className="rounded-2xl border border-ink/10 bg-card p-5">
+                <div className="grid h-10 w-10 place-items-center rounded-xl bg-ink/90 text-cream">
+                  <Icon size={18} />
+                </div>
+                <h3 className="mt-4 font-serif text-xl italic">{f.title}</h3>
+                <p className="mt-1 text-sm text-ink/70">{f.body}</p>
               </div>
-              <h3 className="mt-4 font-serif text-xl italic">{f.title}</h3>
-              <p className="mt-1 text-sm text-ink/70">{f.body}</p>
-            </div>
-          ))}
+            );
+          })}
         </div>
 
         <div className="mt-10 flex items-center justify-center gap-2 text-sm text-ink/70">
@@ -99,7 +107,7 @@ function Landing() {
       </section>
 
       <footer className="border-t border-ink/10 py-8 text-center text-xs text-ink/50">
-        © {new Date().getFullYear()} KenanganSnap · Crafted with care
+        © {new Date().getFullYear()} KenanganSnap · {s.footer_note}
       </footer>
     </div>
   );
