@@ -95,7 +95,7 @@ function CreateEvent() {
               <div className="mt-2 flex items-center gap-2">
                 <input value={slug}
                   onChange={(e) => { setSlug(slugify(e.target.value)); setSlugTouched(true); }}
-                  className="flex-1 rounded-lg border border-ink/15 bg-white px-3 py-1.5 font-mono text-sm outline-none focus:border-gold"
+                  className="flex-1 rounded-lg border border-ink/15 bg-card px-3 py-1.5 font-mono text-sm text-ink outline-none focus:border-gold"
                   placeholder="aisha-daniel" />
                 <button type="button" onClick={() => setEditingSlug(false)}
                   className="inline-flex items-center gap-1 rounded-lg bg-ink px-3 py-1.5 text-xs text-cream">
