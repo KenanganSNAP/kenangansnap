@@ -101,12 +101,17 @@ function ManageEvent() {
 
       <header className="mt-4 grid gap-6 rounded-3xl border border-ink/10 bg-card p-6 lg:grid-cols-[auto,1fr]">
         <div className="flex flex-col items-center gap-3">
-          <div className="rounded-2xl bg-cream p-3 shadow-[0_10px_30px_-15px_rgba(40,25,15,0.3)]">
+          <div ref={qrRef} className="rounded-2xl bg-cream p-3 shadow-[0_10px_30px_-15px_rgba(40,25,15,0.3)]">
             <QRCodeSVG value={guestUrl} size={180} bgColor="transparent" fgColor="#2a1d14" level="M" />
           </div>
-          <button onClick={copy} className="inline-flex items-center gap-1 rounded-full border border-ink/15 px-3 py-1.5 text-xs">
-            <Copy size={12} /> Copy link
-          </button>
+          <div className="flex flex-wrap justify-center gap-2">
+            <button onClick={copy} className="inline-flex items-center gap-1 rounded-full border border-ink/15 px-3 py-1.5 text-xs">
+              <Copy size={12} /> Copy link
+            </button>
+            <button onClick={poster} className="inline-flex items-center gap-1 rounded-full border border-ink/15 px-3 py-1.5 text-xs">
+              <QrCode size={12} /> Poster
+            </button>
+          </div>
         </div>
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2 text-[10px] uppercase tracking-[0.3em] text-ink/55">
@@ -139,6 +144,10 @@ function ManageEvent() {
             </button>
             <input ref={fileRef} type="file" accept="image/*" className="hidden"
               onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadInvite(f); }} />
+            <button onClick={() => zip("all")} disabled={zipping !== null}
+              className="inline-flex items-center gap-1 rounded-full bg-ink px-3 py-1.5 text-sm text-cream disabled:opacity-60">
+              <Package size={14} /> {zipping === "all" ? "Packing…" : "Download all"}
+            </button>
           </div>
         </div>
       </header>
