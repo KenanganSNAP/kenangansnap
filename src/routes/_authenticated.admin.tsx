@@ -10,6 +10,7 @@ function AdminLayout() {
     { to: "/admin", label: "Hosts" },
     { to: "/admin/events", label: "Events" },
     { to: "/admin/guests", label: "Guests" },
+    { to: "/admin/media", label: "Media" },
   ];
   return (
     <div className="py-4">
