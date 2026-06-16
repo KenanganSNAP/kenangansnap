@@ -33,11 +33,14 @@
   --color-ring: var(--ring);
   --color-ring-offset-background: var(--background);
   --color-gold: var(--gold);
+  --color-gold-soft: var(--gold-soft);
   --color-rose: var(--rose);
   --color-cream: var(--cream);
+  --color-cream-deep: var(--cream-deep);
   --color-ink: var(--ink);
   --font-sans: "DM Sans", ui-sans-serif, system-ui, sans-serif;
-  --font-serif: "Cormorant Garamond", "DM Serif Display", ui-serif, Georgia, serif;
+  --font-serif: "Cormorant Garamond", ui-serif, Georgia, serif;
+  --font-script: "Pinyon Script", "Cormorant Garamond", ui-serif, cursive;
 }
 
 :root {
