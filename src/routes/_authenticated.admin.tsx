@@ -11,7 +11,9 @@ function AdminLayout() {
     { to: "/admin/events", label: "Events" },
     { to: "/admin/guests", label: "Guests" },
     { to: "/admin/media", label: "Media" },
+    { to: "/admin/homepage", label: "Homepage" },
   ];
+
   return (
     <div className="py-4">
       <div className="text-[10px] uppercase tracking-[0.3em] text-ink/60">Admin</div>
