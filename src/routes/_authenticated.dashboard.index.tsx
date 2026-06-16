@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { listMyEvents } from "@/lib/kenangan.functions";
 import { Plus, Calendar, Users, Camera, Mic, MessageSquare } from "lucide-react";
 
-export const Route = createFileRoute("/_authenticated/dashboard")({
+export const Route = createFileRoute("/_authenticated/dashboard/")({
   component: Dashboard,
 });
 
