@@ -1,19 +1,31 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
-import { listAllEvents } from "@/lib/kenangan.functions";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { listAllEvents, adminDeleteEvent } from "@/lib/kenangan.functions";
+import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/admin/events")({
   component: AdminEvents,
 });
 
 function AdminEvents() {
+  const qc = useQueryClient();
   const { data, isLoading } = useQuery({ queryKey: ["admin-events"], queryFn: () => listAllEvents() });
+
+  async function remove(id: string, title: string) {
+    if (!confirm(`Delete "${title}" and all its photos, voices, notes, and guests? This cannot be undone.`)) return;
+    try {
+      await adminDeleteEvent({ data: { eventId: id } });
+      toast.success("Event deleted");
+      qc.invalidateQueries({ queryKey: ["admin-events"] });
+    } catch (err) { toast.error((err as Error).message); }
+  }
+
   if (isLoading) return <p className="text-ink/60">Loading…</p>;
   return (
     <div className="overflow-hidden rounded-2xl border border-ink/10 bg-card">
       <table className="w-full text-sm">
         <thead className="bg-cream-deep/60 text-left text-[10px] uppercase tracking-wider text-ink/60">
-          <tr><th className="px-4 py-3">Event</th><th>Host</th><th>Type</th><th>Date</th><th>Status</th><th /></tr>
+          <tr><th className="px-4 py-3">Event</th><th>Host</th><th>Type</th><th>Date</th><th>Status</th><th className="px-4 text-right">Actions</th></tr>
         </thead>
         <tbody>
           {(data ?? []).map((e) => (
@@ -28,7 +40,10 @@ function AdminEvents() {
                 </span>
               </td>
               <td className="px-4 py-3 text-right">
-                <Link to="/event/$slug" params={{ slug: e.slug }} className="text-ink underline">View</Link>
+                <div className="inline-flex gap-2">
+                  <Link to="/event/$slug" params={{ slug: e.slug }} className="text-ink underline">View</Link>
+                  <button onClick={() => remove(e.id, e.title)} className="rounded-full bg-red-600/10 px-3 py-1 text-red-700">Delete</button>
+                </div>
               </td>
             </tr>
           ))}
