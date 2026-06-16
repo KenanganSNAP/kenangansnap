@@ -16,6 +16,7 @@ import { Route as EventSlugRouteImport } from './routes/event.$slug'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated.dashboard'
 import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated.admin'
 import { Route as EventSlugIndexRouteImport } from './routes/event.$slug.index'
+import { Route as AuthenticatedDashboardIndexRouteImport } from './routes/_authenticated.dashboard.index'
 import { Route as AuthenticatedAdminIndexRouteImport } from './routes/_authenticated.admin.index'
 import { Route as EventSlugVoiceRouteImport } from './routes/event.$slug.voice'
 import { Route as EventSlugNotesRouteImport } from './routes/event.$slug.notes'
@@ -61,6 +62,12 @@ const EventSlugIndexRoute = EventSlugIndexRouteImport.update({
   path: '/',
   getParentRoute: () => EventSlugRoute,
 } as any)
+const AuthenticatedDashboardIndexRoute =
+  AuthenticatedDashboardIndexRouteImport.update({
+    id: '/',
+    path: '/',
+    getParentRoute: () => AuthenticatedDashboardRoute,
+  } as any)
 const AuthenticatedAdminIndexRoute = AuthenticatedAdminIndexRouteImport.update({
   id: '/',
   path: '/',
@@ -131,13 +138,13 @@ export interface FileRoutesByFullPath {
   '/event/$slug/notes': typeof EventSlugNotesRoute
   '/event/$slug/voice': typeof EventSlugVoiceRoute
   '/admin/': typeof AuthenticatedAdminIndexRoute
+  '/dashboard/': typeof AuthenticatedDashboardIndexRoute
   '/event/$slug/': typeof EventSlugIndexRoute
   '/dashboard/event/$id': typeof AuthenticatedDashboardEventIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
-  '/dashboard': typeof AuthenticatedDashboardRouteWithChildren
   '/admin/events': typeof AuthenticatedAdminEventsRoute
   '/admin/guests': typeof AuthenticatedAdminGuestsRoute
   '/admin/media': typeof AuthenticatedAdminMediaRoute
@@ -147,6 +154,7 @@ export interface FileRoutesByTo {
   '/event/$slug/notes': typeof EventSlugNotesRoute
   '/event/$slug/voice': typeof EventSlugVoiceRoute
   '/admin': typeof AuthenticatedAdminIndexRoute
+  '/dashboard': typeof AuthenticatedDashboardIndexRoute
   '/event/$slug': typeof EventSlugIndexRoute
   '/dashboard/event/$id': typeof AuthenticatedDashboardEventIdRoute
 }
@@ -167,6 +175,7 @@ export interface FileRoutesById {
   '/event/$slug/notes': typeof EventSlugNotesRoute
   '/event/$slug/voice': typeof EventSlugVoiceRoute
   '/_authenticated/admin/': typeof AuthenticatedAdminIndexRoute
+  '/_authenticated/dashboard/': typeof AuthenticatedDashboardIndexRoute
   '/event/$slug/': typeof EventSlugIndexRoute
   '/_authenticated/dashboard/event/$id': typeof AuthenticatedDashboardEventIdRoute
 }
@@ -187,13 +196,13 @@ export interface FileRouteTypes {
     | '/event/$slug/notes'
     | '/event/$slug/voice'
     | '/admin/'
+    | '/dashboard/'
     | '/event/$slug/'
     | '/dashboard/event/$id'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/auth'
-    | '/dashboard'
     | '/admin/events'
     | '/admin/guests'
     | '/admin/media'
@@ -203,6 +212,7 @@ export interface FileRouteTypes {
     | '/event/$slug/notes'
     | '/event/$slug/voice'
     | '/admin'
+    | '/dashboard'
     | '/event/$slug'
     | '/dashboard/event/$id'
   id:
@@ -222,6 +232,7 @@ export interface FileRouteTypes {
     | '/event/$slug/notes'
     | '/event/$slug/voice'
     | '/_authenticated/admin/'
+    | '/_authenticated/dashboard/'
     | '/event/$slug/'
     | '/_authenticated/dashboard/event/$id'
   fileRoutesById: FileRoutesById
@@ -283,6 +294,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/event/$slug/'
       preLoaderRoute: typeof EventSlugIndexRouteImport
       parentRoute: typeof EventSlugRoute
+    }
+    '/_authenticated/dashboard/': {
+      id: '/_authenticated/dashboard/'
+      path: '/'
+      fullPath: '/dashboard/'
+      preLoaderRoute: typeof AuthenticatedDashboardIndexRouteImport
+      parentRoute: typeof AuthenticatedDashboardRoute
     }
     '/_authenticated/admin/': {
       id: '/_authenticated/admin/'
@@ -376,12 +394,14 @@ const AuthenticatedAdminRouteWithChildren =
 
 interface AuthenticatedDashboardRouteChildren {
   AuthenticatedDashboardCreateRoute: typeof AuthenticatedDashboardCreateRoute
+  AuthenticatedDashboardIndexRoute: typeof AuthenticatedDashboardIndexRoute
   AuthenticatedDashboardEventIdRoute: typeof AuthenticatedDashboardEventIdRoute
 }
 
 const AuthenticatedDashboardRouteChildren: AuthenticatedDashboardRouteChildren =
   {
     AuthenticatedDashboardCreateRoute: AuthenticatedDashboardCreateRoute,
+    AuthenticatedDashboardIndexRoute: AuthenticatedDashboardIndexRoute,
     AuthenticatedDashboardEventIdRoute: AuthenticatedDashboardEventIdRoute,
   }
 
@@ -433,3 +453,13 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
