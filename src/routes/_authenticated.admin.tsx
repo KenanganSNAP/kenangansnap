@@ -17,6 +17,7 @@ function AdminLayout() {
     { to: "/admin/pages/pricing", label: "Pricing" },
     { to: "/admin/pages/how-it-works", label: "How it works" },
     { to: "/admin/pages/about", label: "About" },
+    { to: "/admin/pages/create-event-form", label: "Create-event form" },
   ];
   const onPages = loc.pathname.startsWith("/admin/pages");
 
