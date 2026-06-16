@@ -118,7 +118,7 @@ export const updatePage = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     await requireAdmin(context);
     const { error } = await context.supabase.from("site_settings")
-      .upsert({ key: data.key, settings: data.settings as object, updated_at: new Date().toISOString(), updated_by: context.userId });
+      .upsert({ key: data.key, settings: data.settings as Json, updated_at: new Date().toISOString(), updated_by: context.userId });
     if (error) throw new Error(error.message);
     return { ok: true };
   });

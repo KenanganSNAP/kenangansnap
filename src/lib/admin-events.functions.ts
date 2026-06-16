@@ -84,7 +84,7 @@ export const adminUpdateEvent = createServerFn({ method: "POST" })
     const { error: auditErr } = await context.supabase.from("event_audits").insert({
       event_id: data.id,
       edited_by: context.userId,
-      changed_fields: diff,
+      changed_fields: diff as unknown as Json,
       note: "Edited by Admin",
     });
     if (auditErr) throw new Error(auditErr.message);
