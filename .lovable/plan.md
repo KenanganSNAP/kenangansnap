@@ -1,89 +1,56 @@
-# Plan — Phase 1: Core Admin CMS
+# Phase 2 Plan — Guest-Facing & Operations
 
-Building sections **1, 6, 8** first using **simple structured fields** stored in the existing `site_settings` (jsonb) table. After Phase 1 ships and you confirm, I'll plan Phase 2 (guest-facing: templates, print, dark mode + i18n).
+Building sections 2, 3, 4, 5, 7 on top of Phase 1. Each section is scoped so we can ship and verify it independently before moving on.
 
-## Section 1 — Public pages + admin-editable content
+## Section 2 — Photo Templates (booth overlays/frames)
 
-Three new public routes, each driven by a `site_settings` row:
+- New table `photo_templates` (id, name, kind: 'frame'|'overlay'|'layout', preview_url, asset_url, config jsonb, is_active, sort_order). Admin CRUD at `/admin/templates` with image upload to `site-assets`.
+- New per-event link table `event_templates` (event_id, template_id, sort_order). Host picks which templates are available for their event from the event edit screen.
+- Booth UI (existing capture flow) gets a horizontal template picker. Selected template is composited onto the captured photo before upload (client-side canvas).
+- Stored photo keeps the composited result; original is kept too (new column `photos.original_url`).
 
-- `/pricing` — reads `site_settings` key `pricing_page`
-- `/how-it-works` — reads key `how_it_works_page`
-- `/about` — reads key `about_page`
+## Section 3 — Print Integration
 
-Each page uses structured fields (no block editor): hero title/subtitle/image, a list of items (tiers / steps / team members), and a closing CTA. Public routes use the server publishable client with the existing anon `SELECT` policy on `site_settings`.
+- Abstraction only — no real printer wiring yet.
+- New env/setting: `PRINT_SERVER_URL` (admin-editable in `site_settings.print_config`).
+- Server fn `submitPrintJob({ photoId })` POSTs to that URL with photo URL + event metadata. Wrapped in try/catch; failures surface as a toast in booth UI.
+- "Print" button appears in booth/review screen after capture. Disabled if no print URL configured.
+- No DB queue/log (per your earlier choice).
 
-Admin editors live at:
-- `/admin/pages/pricing`
-- `/admin/pages/how-it-works`
-- `/admin/pages/about`
+## Section 4 — Customisable Create Event Form (admin-editable)
 
-Each editor is a simple form: text inputs, textareas, image uploads (to existing `event-covers` bucket under a `site/` prefix, or new `site-assets` bucket if you prefer), and add/remove/reorder buttons for the item list. Saves go through a `requireSupabaseAuth` server fn that checks `has_role(admin)` and upserts the row.
+- New `site_settings.create_event_form` JSONB: ordered list of field definitions (key, label, type: text|textarea|date|image|toggle, required, help_text, visible).
+- Admin editor at `/admin/pages/create-event-form` using the existing simple structured-field pattern (reorder, toggle visible/required, edit labels & help text). Field `key`s are a fixed allowlist (title, event_date, venue, cover_image, welcome_message, etc.) — admin can't invent new DB columns, only reshape what's shown.
+- `/dashboard/create` reads the config and renders fields dynamically; the auto-slug + Customize UI built last turn stays as-is.
 
-Navigation: add Pricing, How It Works, About links to the public header on `/` (and shared landing layout).
+## Section 5 — Dark Mode + i18n (EN/ID)
 
-## Section 6 — Admin homepage content management
+- **Dark mode**: add `next-themes`, theme toggle in header, ensure tokens in `src/styles.css` already have dark variants (audit + fill gaps). Persist preference in localStorage.
+- **i18n**: add `react-i18next` with `en` + `id` locales. Translate nav, buttons, form labels, validation/error/toast messages, auth screens, booth/guest flow, admin panel UI (per your "all of them" answer). Static marketing copy (About/How It Works/Pricing) stays English in this pass — admin can localise later via CMS.
+- Language toggle in header, persisted in localStorage + `<html lang>`.
 
-Already has `/admin/homepage` — extend it (and create the matching `site_settings` keys + a `homepage_media` table) to manage:
+## Section 7 — Admin Guest Editing
 
-- **Featured photos**: gallery with reorder + delete + "set as hero" flag. New table `homepage_media (id, kind, url, sort_order, is_hero, caption)`.
-- **Featured video**: single field on `site_settings.homepage` — either an uploaded video URL or a YouTube/Vimeo embed URL. Auto-detect and render `<iframe>` for YT/Vimeo, `<video>` otherwise.
-- **Testimonials**: new table `testimonials (id, author_name, author_photo_url, quote, event_name, sort_order)`.
+- Extend `/admin/events/$id` with a Guests tab: list `guests` for that event, edit name/email/phone/RSVP, soft-delete, resend invitation.
+- New `adminUpdateGuest` / `adminDeleteGuest` server fns with `requireSupabaseAuth` + `has_role('admin')`. Audit rows written to `event_audits` (reuse) with `entity_type` discriminator — small migration adds `entity_type text default 'event'` and `entity_id uuid` columns to keep audit generic.
+- Hosts retain their existing per-event guest management; nothing changes for them.
 
-Homepage (`/`) reads these via the server publishable client (anon `SELECT` policies) and renders them in existing sections, replacing the current placeholder content.
+## Sequencing & confirmation gates
 
-## Section 8 — Admin event overview + editing + audit trail
+I'll build in this order and stop for your approval between each:
 
-Extend `/admin/events`:
+1. Section 5 (dark mode + i18n) — touches the whole UI, best to land first so later screens are translated as built.
+2. Section 4 (customisable Create Event form).
+3. Section 2 (photo templates).
+4. Section 3 (print integration).
+5. Section 7 (admin guest editing + audit generalisation).
 
-- Detail view route `/admin/events/$id` showing all event fields, host info, guest count, photo/memory counts.
-- Edit form covering every column on `events` (title, type, date, venue, welcome message, cover image, invitation image, reveal_at, is_active).
-- Status control: add `status text` column to `events` with values `draft | active | completed | cancelled`. Existing `is_active` stays for backwards compatibility (kept in sync: `active` → true, others → false). Default `active`.
-- Audit trail: new table `event_audits (id, event_id, edited_by, edited_at, changed_fields jsonb, note text)`. Every admin-side update inserts a row. Hosts viewing their event in `/dashboard/event/$id` see a banner: "Edited by Admin on {date}" with an expandable list of changed fields.
+## Things I'd like you to confirm or add
 
-Server fns:
-- `adminUpdateEvent` (`requireSupabaseAuth` + admin role check) — updates event and writes audit row in one transaction (RPC).
-- `getEventAudits` — host or admin can read audits for events they own / all events.
+1. **Languages**: EN + Bahasa Melayu (BM). Add any others? No
+2. **Template compositing**: client-side canvas overlay is simplest and works on mobile. OK, or do you want server-side rendering (slower, needs a Worker-safe image lib)? I go with client-side canvas overlay
+3. **Print payload**: I'll send `{ photoUrl, eventId, eventTitle, guestName?, copies: 1 }` as JSON to `PRINT_SERVER_URL`. Add/remove fields? give options to add/remove before printing
+4. **Admin guest editing scope**: edit + soft-delete + resend invite. Want bulk import (CSV) too, or save that for later? save that for later
+5. **Create Event form**: admin can reorder/relabel/hide existing fields only (no new custom fields). Confirm — or do you want admin-defined custom fields stored in `events.custom_data` jsonb? yes
 
-## Technical details
-
-### New tables (all in one migration, with GRANTs + RLS)
-
-```text
-homepage_media(id, kind, url, sort_order, is_hero, caption, created_at, updated_at)
-testimonials(id, author_name, author_photo_url, quote, event_name, sort_order, created_at, updated_at)
-event_audits(id, event_id → events, edited_by → auth.users, changed_fields jsonb, note, created_at)
-events.status text not null default 'active' check (status in ('draft','active','completed','cancelled'))
-```
-
-### RLS
-
-- `homepage_media`, `testimonials`: anon + authenticated SELECT; admin-only INSERT/UPDATE/DELETE via `has_role`.
-- `event_audits`: admin INSERT/SELECT; hosts SELECT only rows for events where `host_id = auth.uid()`.
-- `site_settings`: already correct; reuse keys `pricing_page`, `how_it_works_page`, `about_page`, `homepage`.
-
-### `site_settings` JSON shapes (simple structured fields)
-
-```text
-pricing_page:    { hero:{title,subtitle,image}, tiers:[{name,price,period,features[],cta}], footer_note }
-how_it_works:    { hero:{...}, steps:[{title,body,image}], cta:{label,href} }
-about_page:      { hero:{...}, mission, team:[{name,role,photo,bio}], cta }
-homepage:        { hero_title, hero_subtitle, video_url, video_kind:'youtube'|'vimeo'|'upload' }
-```
-
-### Files to add
-
-- Migration: `supabase/migrations/<ts>_admin_cms_phase1.sql`
-- Public routes: `src/routes/pricing.tsx`, `how-it-works.tsx`, `about.tsx`
-- Admin routes: `src/routes/_authenticated.admin.pages.pricing.tsx`, `.how-it-works.tsx`, `.about.tsx`, `_authenticated.admin.events.$id.tsx`
-- Server fns: `src/lib/cms.functions.ts`, `src/lib/admin-events.functions.ts`
-- Components: `src/components/cms/PageEditor.tsx` (shared form), `src/components/cms/ListEditor.tsx` (add/remove/reorder)
-- Header update for public nav
-
-### Out of scope for Phase 1
-
-- Photo templates, print, dark mode, language toggle, admin-editable Create Event form, admin guest editing — all in Phase 2 plan after your go-ahead.
-- Rich-text/WYSIWYG (you chose simple structured fields).
-
-## Confirmation gate
-
-After Phase 1 is implemented and verified, I'll stop and ask before starting Phase 2 (sections 2, 3, 4, 5, 7).
+Reply with answers (or "go" to accept defaults) and I'll start with Section 5.

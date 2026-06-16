@@ -8,6 +8,8 @@ import {
   Scripts,
 } from "@tanstack/react-router";
 import { useEffect, type ReactNode } from "react";
+import { ThemeProvider } from "@/components/theme-provider";
+import { I18nInit } from "@/components/i18n-init";
 
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
@@ -121,8 +123,11 @@ function RootComponent() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <Outlet />
-      <Toaster position="top-center" richColors closeButton />
+      <ThemeProvider>
+        <I18nInit />
+        <Outlet />
+        <Toaster position="top-center" richColors closeButton />
+      </ThemeProvider>
     </QueryClientProvider>
   );
 }
