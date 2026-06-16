@@ -31,6 +31,9 @@ import { Route as AuthenticatedAdminHomepageRouteImport } from './routes/_authen
 import { Route as AuthenticatedAdminGuestsRouteImport } from './routes/_authenticated.admin.guests'
 import { Route as AuthenticatedAdminEventsRouteImport } from './routes/_authenticated.admin.events'
 import { Route as AuthenticatedDashboardEventIdRouteImport } from './routes/_authenticated.dashboard.event.$id'
+import { Route as AuthenticatedAdminPagesPricingRouteImport } from './routes/_authenticated.admin.pages.pricing'
+import { Route as AuthenticatedAdminPagesHowItWorksRouteImport } from './routes/_authenticated.admin.pages.how-it-works'
+import { Route as AuthenticatedAdminPagesAboutRouteImport } from './routes/_authenticated.admin.pages.about'
 
 const PricingRoute = PricingRouteImport.update({
   id: '/pricing',
@@ -147,6 +150,24 @@ const AuthenticatedDashboardEventIdRoute =
     path: '/event/$id',
     getParentRoute: () => AuthenticatedDashboardRoute,
   } as any)
+const AuthenticatedAdminPagesPricingRoute =
+  AuthenticatedAdminPagesPricingRouteImport.update({
+    id: '/pages/pricing',
+    path: '/pages/pricing',
+    getParentRoute: () => AuthenticatedAdminRoute,
+  } as any)
+const AuthenticatedAdminPagesHowItWorksRoute =
+  AuthenticatedAdminPagesHowItWorksRouteImport.update({
+    id: '/pages/how-it-works',
+    path: '/pages/how-it-works',
+    getParentRoute: () => AuthenticatedAdminRoute,
+  } as any)
+const AuthenticatedAdminPagesAboutRoute =
+  AuthenticatedAdminPagesAboutRouteImport.update({
+    id: '/pages/about',
+    path: '/pages/about',
+    getParentRoute: () => AuthenticatedAdminRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -169,6 +190,9 @@ export interface FileRoutesByFullPath {
   '/admin/': typeof AuthenticatedAdminIndexRoute
   '/dashboard/': typeof AuthenticatedDashboardIndexRoute
   '/event/$slug/': typeof EventSlugIndexRoute
+  '/admin/pages/about': typeof AuthenticatedAdminPagesAboutRoute
+  '/admin/pages/how-it-works': typeof AuthenticatedAdminPagesHowItWorksRoute
+  '/admin/pages/pricing': typeof AuthenticatedAdminPagesPricingRoute
   '/dashboard/event/$id': typeof AuthenticatedDashboardEventIdRoute
 }
 export interface FileRoutesByTo {
@@ -189,6 +213,9 @@ export interface FileRoutesByTo {
   '/admin': typeof AuthenticatedAdminIndexRoute
   '/dashboard': typeof AuthenticatedDashboardIndexRoute
   '/event/$slug': typeof EventSlugIndexRoute
+  '/admin/pages/about': typeof AuthenticatedAdminPagesAboutRoute
+  '/admin/pages/how-it-works': typeof AuthenticatedAdminPagesHowItWorksRoute
+  '/admin/pages/pricing': typeof AuthenticatedAdminPagesPricingRoute
   '/dashboard/event/$id': typeof AuthenticatedDashboardEventIdRoute
 }
 export interface FileRoutesById {
@@ -214,6 +241,9 @@ export interface FileRoutesById {
   '/_authenticated/admin/': typeof AuthenticatedAdminIndexRoute
   '/_authenticated/dashboard/': typeof AuthenticatedDashboardIndexRoute
   '/event/$slug/': typeof EventSlugIndexRoute
+  '/_authenticated/admin/pages/about': typeof AuthenticatedAdminPagesAboutRoute
+  '/_authenticated/admin/pages/how-it-works': typeof AuthenticatedAdminPagesHowItWorksRoute
+  '/_authenticated/admin/pages/pricing': typeof AuthenticatedAdminPagesPricingRoute
   '/_authenticated/dashboard/event/$id': typeof AuthenticatedDashboardEventIdRoute
 }
 export interface FileRouteTypes {
@@ -239,6 +269,9 @@ export interface FileRouteTypes {
     | '/admin/'
     | '/dashboard/'
     | '/event/$slug/'
+    | '/admin/pages/about'
+    | '/admin/pages/how-it-works'
+    | '/admin/pages/pricing'
     | '/dashboard/event/$id'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -259,6 +292,9 @@ export interface FileRouteTypes {
     | '/admin'
     | '/dashboard'
     | '/event/$slug'
+    | '/admin/pages/about'
+    | '/admin/pages/how-it-works'
+    | '/admin/pages/pricing'
     | '/dashboard/event/$id'
   id:
     | '__root__'
@@ -283,6 +319,9 @@ export interface FileRouteTypes {
     | '/_authenticated/admin/'
     | '/_authenticated/dashboard/'
     | '/event/$slug/'
+    | '/_authenticated/admin/pages/about'
+    | '/_authenticated/admin/pages/how-it-works'
+    | '/_authenticated/admin/pages/pricing'
     | '/_authenticated/dashboard/event/$id'
   fileRoutesById: FileRoutesById
 }
@@ -452,6 +491,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedDashboardEventIdRouteImport
       parentRoute: typeof AuthenticatedDashboardRoute
     }
+    '/_authenticated/admin/pages/pricing': {
+      id: '/_authenticated/admin/pages/pricing'
+      path: '/pages/pricing'
+      fullPath: '/admin/pages/pricing'
+      preLoaderRoute: typeof AuthenticatedAdminPagesPricingRouteImport
+      parentRoute: typeof AuthenticatedAdminRoute
+    }
+    '/_authenticated/admin/pages/how-it-works': {
+      id: '/_authenticated/admin/pages/how-it-works'
+      path: '/pages/how-it-works'
+      fullPath: '/admin/pages/how-it-works'
+      preLoaderRoute: typeof AuthenticatedAdminPagesHowItWorksRouteImport
+      parentRoute: typeof AuthenticatedAdminRoute
+    }
+    '/_authenticated/admin/pages/about': {
+      id: '/_authenticated/admin/pages/about'
+      path: '/pages/about'
+      fullPath: '/admin/pages/about'
+      preLoaderRoute: typeof AuthenticatedAdminPagesAboutRouteImport
+      parentRoute: typeof AuthenticatedAdminRoute
+    }
   }
 }
 
@@ -461,6 +521,9 @@ interface AuthenticatedAdminRouteChildren {
   AuthenticatedAdminHomepageRoute: typeof AuthenticatedAdminHomepageRoute
   AuthenticatedAdminMediaRoute: typeof AuthenticatedAdminMediaRoute
   AuthenticatedAdminIndexRoute: typeof AuthenticatedAdminIndexRoute
+  AuthenticatedAdminPagesAboutRoute: typeof AuthenticatedAdminPagesAboutRoute
+  AuthenticatedAdminPagesHowItWorksRoute: typeof AuthenticatedAdminPagesHowItWorksRoute
+  AuthenticatedAdminPagesPricingRoute: typeof AuthenticatedAdminPagesPricingRoute
 }
 
 const AuthenticatedAdminRouteChildren: AuthenticatedAdminRouteChildren = {
@@ -469,6 +532,10 @@ const AuthenticatedAdminRouteChildren: AuthenticatedAdminRouteChildren = {
   AuthenticatedAdminHomepageRoute: AuthenticatedAdminHomepageRoute,
   AuthenticatedAdminMediaRoute: AuthenticatedAdminMediaRoute,
   AuthenticatedAdminIndexRoute: AuthenticatedAdminIndexRoute,
+  AuthenticatedAdminPagesAboutRoute: AuthenticatedAdminPagesAboutRoute,
+  AuthenticatedAdminPagesHowItWorksRoute:
+    AuthenticatedAdminPagesHowItWorksRoute,
+  AuthenticatedAdminPagesPricingRoute: AuthenticatedAdminPagesPricingRoute,
 }
 
 const AuthenticatedAdminRouteWithChildren =
