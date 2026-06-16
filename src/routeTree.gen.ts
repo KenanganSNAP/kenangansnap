@@ -9,7 +9,10 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as PricingRouteImport } from './routes/pricing'
+import { Route as HowItWorksRouteImport } from './routes/how-it-works'
 import { Route as AuthRouteImport } from './routes/auth'
+import { Route as AboutRouteImport } from './routes/about'
 import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as EventSlugRouteImport } from './routes/event.$slug'
@@ -28,10 +31,29 @@ import { Route as AuthenticatedAdminHomepageRouteImport } from './routes/_authen
 import { Route as AuthenticatedAdminGuestsRouteImport } from './routes/_authenticated.admin.guests'
 import { Route as AuthenticatedAdminEventsRouteImport } from './routes/_authenticated.admin.events'
 import { Route as AuthenticatedDashboardEventIdRouteImport } from './routes/_authenticated.dashboard.event.$id'
+import { Route as AuthenticatedAdminPagesPricingRouteImport } from './routes/_authenticated.admin.pages.pricing'
+import { Route as AuthenticatedAdminPagesHowItWorksRouteImport } from './routes/_authenticated.admin.pages.how-it-works'
+import { Route as AuthenticatedAdminPagesAboutRouteImport } from './routes/_authenticated.admin.pages.about'
+import { Route as AuthenticatedAdminEventsIdRouteImport } from './routes/_authenticated.admin.events.$id'
 
+const PricingRoute = PricingRouteImport.update({
+  id: '/pricing',
+  path: '/pricing',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const HowItWorksRoute = HowItWorksRouteImport.update({
+  id: '/how-it-works',
+  path: '/how-it-works',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AuthRoute = AuthRouteImport.update({
   id: '/auth',
   path: '/auth',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AboutRoute = AboutRouteImport.update({
+  id: '/about',
+  path: '/about',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthenticatedRoute = AuthenticatedRouteImport.update({
@@ -129,14 +151,41 @@ const AuthenticatedDashboardEventIdRoute =
     path: '/event/$id',
     getParentRoute: () => AuthenticatedDashboardRoute,
   } as any)
+const AuthenticatedAdminPagesPricingRoute =
+  AuthenticatedAdminPagesPricingRouteImport.update({
+    id: '/pages/pricing',
+    path: '/pages/pricing',
+    getParentRoute: () => AuthenticatedAdminRoute,
+  } as any)
+const AuthenticatedAdminPagesHowItWorksRoute =
+  AuthenticatedAdminPagesHowItWorksRouteImport.update({
+    id: '/pages/how-it-works',
+    path: '/pages/how-it-works',
+    getParentRoute: () => AuthenticatedAdminRoute,
+  } as any)
+const AuthenticatedAdminPagesAboutRoute =
+  AuthenticatedAdminPagesAboutRouteImport.update({
+    id: '/pages/about',
+    path: '/pages/about',
+    getParentRoute: () => AuthenticatedAdminRoute,
+  } as any)
+const AuthenticatedAdminEventsIdRoute =
+  AuthenticatedAdminEventsIdRouteImport.update({
+    id: '/$id',
+    path: '/$id',
+    getParentRoute: () => AuthenticatedAdminEventsRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/about': typeof AboutRoute
   '/auth': typeof AuthRoute
+  '/how-it-works': typeof HowItWorksRoute
+  '/pricing': typeof PricingRoute
   '/admin': typeof AuthenticatedAdminRouteWithChildren
   '/dashboard': typeof AuthenticatedDashboardRouteWithChildren
   '/event/$slug': typeof EventSlugRouteWithChildren
-  '/admin/events': typeof AuthenticatedAdminEventsRoute
+  '/admin/events': typeof AuthenticatedAdminEventsRouteWithChildren
   '/admin/guests': typeof AuthenticatedAdminGuestsRoute
   '/admin/homepage': typeof AuthenticatedAdminHomepageRoute
   '/admin/media': typeof AuthenticatedAdminMediaRoute
@@ -148,12 +197,19 @@ export interface FileRoutesByFullPath {
   '/admin/': typeof AuthenticatedAdminIndexRoute
   '/dashboard/': typeof AuthenticatedDashboardIndexRoute
   '/event/$slug/': typeof EventSlugIndexRoute
+  '/admin/events/$id': typeof AuthenticatedAdminEventsIdRoute
+  '/admin/pages/about': typeof AuthenticatedAdminPagesAboutRoute
+  '/admin/pages/how-it-works': typeof AuthenticatedAdminPagesHowItWorksRoute
+  '/admin/pages/pricing': typeof AuthenticatedAdminPagesPricingRoute
   '/dashboard/event/$id': typeof AuthenticatedDashboardEventIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/about': typeof AboutRoute
   '/auth': typeof AuthRoute
-  '/admin/events': typeof AuthenticatedAdminEventsRoute
+  '/how-it-works': typeof HowItWorksRoute
+  '/pricing': typeof PricingRoute
+  '/admin/events': typeof AuthenticatedAdminEventsRouteWithChildren
   '/admin/guests': typeof AuthenticatedAdminGuestsRoute
   '/admin/homepage': typeof AuthenticatedAdminHomepageRoute
   '/admin/media': typeof AuthenticatedAdminMediaRoute
@@ -165,17 +221,24 @@ export interface FileRoutesByTo {
   '/admin': typeof AuthenticatedAdminIndexRoute
   '/dashboard': typeof AuthenticatedDashboardIndexRoute
   '/event/$slug': typeof EventSlugIndexRoute
+  '/admin/events/$id': typeof AuthenticatedAdminEventsIdRoute
+  '/admin/pages/about': typeof AuthenticatedAdminPagesAboutRoute
+  '/admin/pages/how-it-works': typeof AuthenticatedAdminPagesHowItWorksRoute
+  '/admin/pages/pricing': typeof AuthenticatedAdminPagesPricingRoute
   '/dashboard/event/$id': typeof AuthenticatedDashboardEventIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/_authenticated': typeof AuthenticatedRouteWithChildren
+  '/about': typeof AboutRoute
   '/auth': typeof AuthRoute
+  '/how-it-works': typeof HowItWorksRoute
+  '/pricing': typeof PricingRoute
   '/_authenticated/admin': typeof AuthenticatedAdminRouteWithChildren
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRouteWithChildren
   '/event/$slug': typeof EventSlugRouteWithChildren
-  '/_authenticated/admin/events': typeof AuthenticatedAdminEventsRoute
+  '/_authenticated/admin/events': typeof AuthenticatedAdminEventsRouteWithChildren
   '/_authenticated/admin/guests': typeof AuthenticatedAdminGuestsRoute
   '/_authenticated/admin/homepage': typeof AuthenticatedAdminHomepageRoute
   '/_authenticated/admin/media': typeof AuthenticatedAdminMediaRoute
@@ -187,13 +250,20 @@ export interface FileRoutesById {
   '/_authenticated/admin/': typeof AuthenticatedAdminIndexRoute
   '/_authenticated/dashboard/': typeof AuthenticatedDashboardIndexRoute
   '/event/$slug/': typeof EventSlugIndexRoute
+  '/_authenticated/admin/events/$id': typeof AuthenticatedAdminEventsIdRoute
+  '/_authenticated/admin/pages/about': typeof AuthenticatedAdminPagesAboutRoute
+  '/_authenticated/admin/pages/how-it-works': typeof AuthenticatedAdminPagesHowItWorksRoute
+  '/_authenticated/admin/pages/pricing': typeof AuthenticatedAdminPagesPricingRoute
   '/_authenticated/dashboard/event/$id': typeof AuthenticatedDashboardEventIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/about'
     | '/auth'
+    | '/how-it-works'
+    | '/pricing'
     | '/admin'
     | '/dashboard'
     | '/event/$slug'
@@ -209,11 +279,18 @@ export interface FileRouteTypes {
     | '/admin/'
     | '/dashboard/'
     | '/event/$slug/'
+    | '/admin/events/$id'
+    | '/admin/pages/about'
+    | '/admin/pages/how-it-works'
+    | '/admin/pages/pricing'
     | '/dashboard/event/$id'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/about'
     | '/auth'
+    | '/how-it-works'
+    | '/pricing'
     | '/admin/events'
     | '/admin/guests'
     | '/admin/homepage'
@@ -226,12 +303,19 @@ export interface FileRouteTypes {
     | '/admin'
     | '/dashboard'
     | '/event/$slug'
+    | '/admin/events/$id'
+    | '/admin/pages/about'
+    | '/admin/pages/how-it-works'
+    | '/admin/pages/pricing'
     | '/dashboard/event/$id'
   id:
     | '__root__'
     | '/'
     | '/_authenticated'
+    | '/about'
     | '/auth'
+    | '/how-it-works'
+    | '/pricing'
     | '/_authenticated/admin'
     | '/_authenticated/dashboard'
     | '/event/$slug'
@@ -247,23 +331,51 @@ export interface FileRouteTypes {
     | '/_authenticated/admin/'
     | '/_authenticated/dashboard/'
     | '/event/$slug/'
+    | '/_authenticated/admin/events/$id'
+    | '/_authenticated/admin/pages/about'
+    | '/_authenticated/admin/pages/how-it-works'
+    | '/_authenticated/admin/pages/pricing'
     | '/_authenticated/dashboard/event/$id'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuthenticatedRoute: typeof AuthenticatedRouteWithChildren
+  AboutRoute: typeof AboutRoute
   AuthRoute: typeof AuthRoute
+  HowItWorksRoute: typeof HowItWorksRoute
+  PricingRoute: typeof PricingRoute
   EventSlugRoute: typeof EventSlugRouteWithChildren
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/pricing': {
+      id: '/pricing'
+      path: '/pricing'
+      fullPath: '/pricing'
+      preLoaderRoute: typeof PricingRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/how-it-works': {
+      id: '/how-it-works'
+      path: '/how-it-works'
+      fullPath: '/how-it-works'
+      preLoaderRoute: typeof HowItWorksRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/auth': {
       id: '/auth'
       path: '/auth'
       fullPath: '/auth'
       preLoaderRoute: typeof AuthRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/about': {
+      id: '/about'
+      path: '/about'
+      fullPath: '/about'
+      preLoaderRoute: typeof AboutRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_authenticated': {
@@ -392,23 +504,72 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedDashboardEventIdRouteImport
       parentRoute: typeof AuthenticatedDashboardRoute
     }
+    '/_authenticated/admin/pages/pricing': {
+      id: '/_authenticated/admin/pages/pricing'
+      path: '/pages/pricing'
+      fullPath: '/admin/pages/pricing'
+      preLoaderRoute: typeof AuthenticatedAdminPagesPricingRouteImport
+      parentRoute: typeof AuthenticatedAdminRoute
+    }
+    '/_authenticated/admin/pages/how-it-works': {
+      id: '/_authenticated/admin/pages/how-it-works'
+      path: '/pages/how-it-works'
+      fullPath: '/admin/pages/how-it-works'
+      preLoaderRoute: typeof AuthenticatedAdminPagesHowItWorksRouteImport
+      parentRoute: typeof AuthenticatedAdminRoute
+    }
+    '/_authenticated/admin/pages/about': {
+      id: '/_authenticated/admin/pages/about'
+      path: '/pages/about'
+      fullPath: '/admin/pages/about'
+      preLoaderRoute: typeof AuthenticatedAdminPagesAboutRouteImport
+      parentRoute: typeof AuthenticatedAdminRoute
+    }
+    '/_authenticated/admin/events/$id': {
+      id: '/_authenticated/admin/events/$id'
+      path: '/$id'
+      fullPath: '/admin/events/$id'
+      preLoaderRoute: typeof AuthenticatedAdminEventsIdRouteImport
+      parentRoute: typeof AuthenticatedAdminEventsRoute
+    }
   }
 }
 
+interface AuthenticatedAdminEventsRouteChildren {
+  AuthenticatedAdminEventsIdRoute: typeof AuthenticatedAdminEventsIdRoute
+}
+
+const AuthenticatedAdminEventsRouteChildren: AuthenticatedAdminEventsRouteChildren =
+  {
+    AuthenticatedAdminEventsIdRoute: AuthenticatedAdminEventsIdRoute,
+  }
+
+const AuthenticatedAdminEventsRouteWithChildren =
+  AuthenticatedAdminEventsRoute._addFileChildren(
+    AuthenticatedAdminEventsRouteChildren,
+  )
+
 interface AuthenticatedAdminRouteChildren {
-  AuthenticatedAdminEventsRoute: typeof AuthenticatedAdminEventsRoute
+  AuthenticatedAdminEventsRoute: typeof AuthenticatedAdminEventsRouteWithChildren
   AuthenticatedAdminGuestsRoute: typeof AuthenticatedAdminGuestsRoute
   AuthenticatedAdminHomepageRoute: typeof AuthenticatedAdminHomepageRoute
   AuthenticatedAdminMediaRoute: typeof AuthenticatedAdminMediaRoute
   AuthenticatedAdminIndexRoute: typeof AuthenticatedAdminIndexRoute
+  AuthenticatedAdminPagesAboutRoute: typeof AuthenticatedAdminPagesAboutRoute
+  AuthenticatedAdminPagesHowItWorksRoute: typeof AuthenticatedAdminPagesHowItWorksRoute
+  AuthenticatedAdminPagesPricingRoute: typeof AuthenticatedAdminPagesPricingRoute
 }
 
 const AuthenticatedAdminRouteChildren: AuthenticatedAdminRouteChildren = {
-  AuthenticatedAdminEventsRoute: AuthenticatedAdminEventsRoute,
+  AuthenticatedAdminEventsRoute: AuthenticatedAdminEventsRouteWithChildren,
   AuthenticatedAdminGuestsRoute: AuthenticatedAdminGuestsRoute,
   AuthenticatedAdminHomepageRoute: AuthenticatedAdminHomepageRoute,
   AuthenticatedAdminMediaRoute: AuthenticatedAdminMediaRoute,
   AuthenticatedAdminIndexRoute: AuthenticatedAdminIndexRoute,
+  AuthenticatedAdminPagesAboutRoute: AuthenticatedAdminPagesAboutRoute,
+  AuthenticatedAdminPagesHowItWorksRoute:
+    AuthenticatedAdminPagesHowItWorksRoute,
+  AuthenticatedAdminPagesPricingRoute: AuthenticatedAdminPagesPricingRoute,
 }
 
 const AuthenticatedAdminRouteWithChildren =
@@ -469,7 +630,10 @@ const EventSlugRouteWithChildren = EventSlugRoute._addFileChildren(
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthenticatedRoute: AuthenticatedRouteWithChildren,
+  AboutRoute: AboutRoute,
   AuthRoute: AuthRoute,
+  HowItWorksRoute: HowItWorksRoute,
+  PricingRoute: PricingRoute,
   EventSlugRoute: EventSlugRouteWithChildren,
 }
 export const routeTree = rootRouteImport

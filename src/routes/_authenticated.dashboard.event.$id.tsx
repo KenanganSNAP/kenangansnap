@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import {
   getEventForHost, toggleEventActive, deletePhoto, deleteMemory, updateEventInvitation,
 } from "@/lib/kenangan.functions";
+import { listEventAuditsForHost } from "@/lib/admin-events.functions";
 import { resizeImageToDataUrl } from "@/lib/image-resize";
 import { downloadFile, safeFilename } from "@/lib/download";
 import { exportZip } from "@/lib/zip-export";
@@ -23,6 +24,7 @@ function ManageEvent() {
     queryKey: ["event", id],
     queryFn: () => getEventForHost({ data: { id } }),
   });
+  const { data: audits = [] } = useQuery({ queryKey: ["event-audits", id], queryFn: () => listEventAuditsForHost({ data: { id } }) });
   const fileRef = useRef<HTMLInputElement>(null);
   const qrRef = useRef<HTMLDivElement>(null);
   const [busy, setBusy] = useState(false);
@@ -98,6 +100,23 @@ function ManageEvent() {
   return (
     <div className="py-4">
       <Link to="/dashboard" className="inline-flex items-center gap-1 text-sm text-ink/70"><ArrowLeft size={14} /> Back</Link>
+      {audits.length > 0 && (
+        <details className="mt-3 rounded-xl border border-gold/40 bg-gold/10 p-3 text-sm">
+          <summary className="cursor-pointer font-medium text-ink">Edited by Admin on {new Date(audits[0].created_at).toLocaleString()} — {Object.keys(audits[0].changed_fields as Record<string, unknown>).length} field(s). View all {audits.length} edit{audits.length > 1 ? "s" : ""}.</summary>
+          <ul className="mt-3 space-y-2">
+            {audits.map((a) => (
+              <li key={a.id} className="rounded-lg bg-cream/60 p-2 text-xs">
+                <div className="text-ink/60">{new Date(a.created_at).toLocaleString()}</div>
+                <ul className="mt-1 space-y-0.5">
+                  {Object.entries(a.changed_fields as Record<string, { from: unknown; to: unknown }>).map(([k, v]) => (
+                    <li key={k}><b>{k}:</b> <span className="line-through text-ink/55">{String(v.from ?? "—")}</span> → {String(v.to ?? "—")}</li>
+                  ))}
+                </ul>
+              </li>
+            ))}
+          </ul>
+        </details>
+      )}
 
       <header className="mt-4 grid gap-6 rounded-3xl border border-ink/10 bg-card p-6 lg:grid-cols-[auto,1fr]">
         <div className="flex flex-col items-center gap-3">

@@ -14,6 +14,41 @@ export type Database = {
   }
   public: {
     Tables: {
+      event_audits: {
+        Row: {
+          changed_fields: Json
+          created_at: string
+          edited_by: string | null
+          event_id: string
+          id: string
+          note: string | null
+        }
+        Insert: {
+          changed_fields?: Json
+          created_at?: string
+          edited_by?: string | null
+          event_id: string
+          id?: string
+          note?: string | null
+        }
+        Update: {
+          changed_fields?: Json
+          created_at?: string
+          edited_by?: string | null
+          event_id?: string
+          id?: string
+          note?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "event_audits_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       events: {
         Row: {
           cover_image_url: string | null
@@ -26,6 +61,7 @@ export type Database = {
           is_active: boolean
           reveal_at: string | null
           slug: string
+          status: string
           title: string
           venue: string | null
           welcome_message: string | null
@@ -41,6 +77,7 @@ export type Database = {
           is_active?: boolean
           reveal_at?: string | null
           slug: string
+          status?: string
           title: string
           venue?: string | null
           welcome_message?: string | null
@@ -56,6 +93,7 @@ export type Database = {
           is_active?: boolean
           reveal_at?: string | null
           slug?: string
+          status?: string
           title?: string
           venue?: string | null
           welcome_message?: string | null
@@ -93,6 +131,39 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      homepage_media: {
+        Row: {
+          caption: string | null
+          created_at: string
+          id: string
+          is_hero: boolean
+          kind: string
+          sort_order: number
+          storage_path: string
+          updated_at: string
+        }
+        Insert: {
+          caption?: string | null
+          created_at?: string
+          id?: string
+          is_hero?: boolean
+          kind?: string
+          sort_order?: number
+          storage_path: string
+          updated_at?: string
+        }
+        Update: {
+          caption?: string | null
+          created_at?: string
+          id?: string
+          is_hero?: boolean
+          kind?: string
+          sort_order?: number
+          storage_path?: string
+          updated_at?: string
+        }
+        Relationships: []
       }
       hosts: {
         Row: {
@@ -229,6 +300,39 @@ export type Database = {
           settings?: Json
           updated_at?: string
           updated_by?: string | null
+        }
+        Relationships: []
+      }
+      testimonials: {
+        Row: {
+          author_name: string
+          author_photo_path: string | null
+          created_at: string
+          event_name: string | null
+          id: string
+          quote: string
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          author_name: string
+          author_photo_path?: string | null
+          created_at?: string
+          event_name?: string | null
+          id?: string
+          quote: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          author_name?: string
+          author_photo_path?: string | null
+          created_at?: string
+          event_name?: string | null
+          id?: string
+          quote?: string
+          sort_order?: number
+          updated_at?: string
         }
         Relationships: []
       }
