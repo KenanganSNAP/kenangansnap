@@ -1,5 +1,8 @@
 import { createFileRoute, Link, Outlet, useLocation } from "@tanstack/react-router";
+import { useQuery } from "@tanstack/react-query";
+import { Bell } from "lucide-react";
 import { HeaderControls } from "@/components/header-controls";
+import { listHosts } from "@/lib/kenangan.functions";
 
 export const Route = createFileRoute("/_authenticated/admin")({
   component: AdminLayout,
@@ -24,12 +27,29 @@ function AdminLayout() {
   ];
   const onPages = loc.pathname.startsWith("/admin/pages");
 
+  const { data: hosts } = useQuery({ queryKey: ["admin-hosts"], queryFn: () => listHosts(), staleTime: 30_000 });
+  const pendingCount = (hosts ?? []).filter((h) => h.status === "pending").length;
+
   return (
     <div className="py-4">
       <div className="flex items-start justify-between gap-3">
-        <div>
-          <div className="text-[10px] uppercase tracking-[0.3em] text-ink/60">Admin</div>
-          <h1 className="mt-1 font-serif text-4xl italic">Studio control</h1>
+        <div className="flex items-start gap-3">
+          <div>
+            <div className="text-[10px] uppercase tracking-[0.3em] text-ink/60">Admin</div>
+            <h1 className="mt-1 font-serif text-4xl italic">Studio control</h1>
+          </div>
+          <Link
+            to="/admin"
+            title={pendingCount ? `${pendingCount} host${pendingCount === 1 ? "" : "s"} awaiting approval` : "No pending hosts"}
+            className="relative mt-2 inline-flex h-9 w-9 items-center justify-center rounded-full border border-ink/10 bg-card text-ink/70 hover:bg-ink/5"
+          >
+            <Bell size={16} />
+            {pendingCount > 0 && (
+              <span className="absolute -right-1 -top-1 grid h-5 min-w-[20px] place-items-center rounded-full bg-amber-500 px-1 text-[10px] font-semibold text-white">
+                {pendingCount}
+              </span>
+            )}
+          </Link>
         </div>
         <HeaderControls />
       </div>
