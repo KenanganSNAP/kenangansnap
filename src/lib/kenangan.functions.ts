@@ -497,6 +497,55 @@ export const listAllGuests = createServerFn({ method: "GET" })
     return data ?? [];
   });
 
+// ADMIN: list guests for a single event
+export const listEventGuestsForAdmin = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { eventId: string }) => z.object({ eventId: z.string().uuid() }).parse(d))
+  .handler(async ({ data, context }) => {
+    await requireAdmin(context);
+    const [guestsRes, photosRes] = await Promise.all([
+      context.supabase.from("guests")
+        .select("id, name, created_at").eq("event_id", data.eventId)
+        .order("created_at", { ascending: false }),
+      context.supabase.from("photos")
+        .select("guest_id").eq("event_id", data.eventId),
+    ]);
+    if (guestsRes.error) throw new Error(guestsRes.error.message);
+    const counts = new Map<string, number>();
+    for (const p of photosRes.data ?? []) {
+      if (p.guest_id) counts.set(p.guest_id, (counts.get(p.guest_id) ?? 0) + 1);
+    }
+    return (guestsRes.data ?? []).map((g) => ({ ...g, photo_count: counts.get(g.id) ?? 0 }));
+  });
+
+// ADMIN: rename guest (audited)
+export const adminUpdateGuest = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { guestId: string; name: string }) =>
+    z.object({ guestId: z.string().uuid(), name: z.string().min(1).max(60) }).parse(d))
+  .handler(async ({ data, context }) => {
+    await requireAdmin(context);
+    const { data: before, error: bErr } = await context.supabase.from("guests")
+      .select("id, name, event_id").eq("id", data.guestId).maybeSingle();
+    if (bErr) throw new Error(bErr.message);
+    if (!before) throw new Error("Guest not found");
+    const newName = data.name.trim();
+    if (newName === before.name) return { ok: true, changed: 0 };
+    const { error } = await context.supabase.from("guests")
+      .update({ name: newName }).eq("id", data.guestId);
+    if (error) throw new Error(error.message);
+    await context.supabase.from("event_audits").insert({
+      event_id: before.event_id,
+      entity_type: "guest",
+      entity_id: before.id,
+      edited_by: context.userId,
+      changed_fields: { name: { from: before.name, to: newName } } as unknown as import("@/integrations/supabase/types").Json,
+      note: "Guest renamed by Admin",
+    });
+    return { ok: true, changed: 1 };
+  });
+
+
 // ADMIN: list all media across events (signed URLs)
 export const listAllMedia = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
@@ -621,10 +670,23 @@ export const adminDeleteGuest = createServerFn({ method: "POST" })
   .inputValidator((d: { guestId: string }) => z.object({ guestId: z.string().uuid() }).parse(d))
   .handler(async ({ data, context }) => {
     await requireAdmin(context);
+    const { data: before } = await context.supabase.from("guests")
+      .select("id, name, event_id").eq("id", data.guestId).maybeSingle();
     const { error } = await context.supabase.from("guests").delete().eq("id", data.guestId);
     if (error) throw new Error(error.message);
+    if (before) {
+      await context.supabase.from("event_audits").insert({
+        event_id: before.event_id,
+        entity_type: "guest",
+        entity_id: before.id,
+        edited_by: context.userId,
+        changed_fields: { name: { from: before.name, to: null } } as unknown as import("@/integrations/supabase/types").Json,
+        note: "Guest deleted by Admin",
+      });
+    }
     return { ok: true };
   });
+
 
 // HOMEPAGE settings
 export type HomepageSettings = {
