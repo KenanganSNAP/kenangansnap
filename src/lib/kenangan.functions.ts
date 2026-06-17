@@ -109,10 +109,7 @@ export const uploadPhoto = createServerFn({ method: "POST" })
   )
   .handler(async ({ data }) => {
     const sb = publicClient();
-    const { data: event, error: eErr } = await sb.from("events")
-      .select("id, is_active").eq("slug", data.slug).maybeSingle();
-    if (eErr) throw new Error(eErr.message);
-    if (!event || !event.is_active) throw new Error("Event not available");
+    const event = await loadEventForGuestAction(sb, data.slug, { capTable: "photos", capCol: "max_photos" });
 
     async function uploadDataUrl(dataUrl: string) {
       const [meta, b64] = dataUrl.split(",");
