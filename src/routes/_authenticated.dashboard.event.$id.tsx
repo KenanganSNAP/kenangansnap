@@ -7,6 +7,7 @@ import {
   getEventForHost, toggleEventActive, deletePhoto, deleteMemory, updateEventInvitation,
 } from "@/lib/kenangan.functions";
 import { listEventAuditsForHost } from "@/lib/admin-events.functions";
+import { listActiveTemplates, getEventTemplates, setEventTemplates } from "@/lib/templates.functions";
 import { resizeImageToDataUrl } from "@/lib/image-resize";
 import { downloadFile, safeFilename } from "@/lib/download";
 import { exportZip } from "@/lib/zip-export";
@@ -221,6 +222,10 @@ function ManageEvent() {
         )}
       </Section>
 
+      <Section title="Photo templates">
+        <TemplatePicker eventId={event.id} />
+      </Section>
+
       <Section title="Guests">
         {guests.length === 0 ? <Empty msg="No guests yet" /> : (
           <ul className="flex flex-wrap gap-2">
@@ -259,5 +264,53 @@ function IconBtn({ children, onClick, danger }: { children: React.ReactNode; onC
       className={`grid h-7 w-7 place-items-center rounded-full ${danger ? "bg-red-500/10 text-red-600 hover:bg-red-500/20" : "bg-cream/80 text-ink hover:bg-cream"}`}>
       {children}
     </button>
+  );
+}
+
+function TemplatePicker({ eventId }: { eventId: string }) {
+  const qc = useQueryClient();
+  const { data: all = [] } = useQuery({ queryKey: ["active-templates"], queryFn: () => listActiveTemplates() });
+  const { data: selectedIds = [] } = useQuery({ queryKey: ["event-templates", eventId], queryFn: () => getEventTemplates({ data: { eventId } }) });
+  const [saving, setSaving] = useState(false);
+  const selected = new Set(selectedIds);
+
+  async function toggle(id: string) {
+    const next = new Set(selected);
+    if (next.has(id)) next.delete(id); else next.add(id);
+    setSaving(true);
+    try {
+      await setEventTemplates({ data: { eventId, templateIds: Array.from(next) } });
+      qc.invalidateQueries({ queryKey: ["event-templates", eventId] });
+    } catch (e) { toast.error((e as Error).message); }
+    finally { setSaving(false); }
+  }
+
+  if (all.length === 0) return <Empty msg="No templates available yet — ask the admin to add some." />;
+
+  return (
+    <div>
+      <p className="mb-3 text-sm text-ink/65">Pick the frames or overlays guests can apply to their photos. {selected.size === 0 && "Nothing selected — all active templates will be shown."}</p>
+      <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+        {all.map((t) => {
+          const on = selected.has(t.id);
+          return (
+            <li key={t.id}>
+              <button disabled={saving} onClick={() => toggle(t.id)}
+                className={`group relative block w-full overflow-hidden rounded-2xl border-2 bg-[repeating-conic-gradient(#eee_0_25%,#fff_0_50%)] bg-[length:20px_20px] ${on ? "border-ink" : "border-ink/10"}`}>
+                <div className="aspect-square">
+                  {(t.preview_url ?? t.asset_url) ? (
+                    <img src={t.preview_url ?? t.asset_url ?? ""} alt={t.name} className="h-full w-full object-contain" />
+                  ) : null}
+                </div>
+                <div className={`absolute inset-x-0 bottom-0 flex items-center justify-between px-2 py-1 text-xs ${on ? "bg-ink text-cream" : "bg-cream/85 text-ink"}`}>
+                  <span className="truncate italic">{t.name}</span>
+                  <span>{on ? "✓" : "+"}</span>
+                </div>
+              </button>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
   );
 }
