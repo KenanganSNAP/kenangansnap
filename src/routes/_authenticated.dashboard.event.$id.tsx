@@ -266,3 +266,51 @@ function IconBtn({ children, onClick, danger }: { children: React.ReactNode; onC
     </button>
   );
 }
+
+function TemplatePicker({ eventId }: { eventId: string }) {
+  const qc = useQueryClient();
+  const { data: all = [] } = useQuery({ queryKey: ["active-templates"], queryFn: () => listActiveTemplates() });
+  const { data: selectedIds = [] } = useQuery({ queryKey: ["event-templates", eventId], queryFn: () => getEventTemplates({ data: { eventId } }) });
+  const [saving, setSaving] = useState(false);
+  const selected = new Set(selectedIds);
+
+  async function toggle(id: string) {
+    const next = new Set(selected);
+    if (next.has(id)) next.delete(id); else next.add(id);
+    setSaving(true);
+    try {
+      await setEventTemplates({ data: { eventId, templateIds: Array.from(next) } });
+      qc.invalidateQueries({ queryKey: ["event-templates", eventId] });
+    } catch (e) { toast.error((e as Error).message); }
+    finally { setSaving(false); }
+  }
+
+  if (all.length === 0) return <Empty msg="No templates available yet — ask the admin to add some." />;
+
+  return (
+    <div>
+      <p className="mb-3 text-sm text-ink/65">Pick the frames or overlays guests can apply to their photos. {selected.size === 0 && "Nothing selected — all active templates will be shown."}</p>
+      <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+        {all.map((t) => {
+          const on = selected.has(t.id);
+          return (
+            <li key={t.id}>
+              <button disabled={saving} onClick={() => toggle(t.id)}
+                className={`group relative block w-full overflow-hidden rounded-2xl border-2 bg-[repeating-conic-gradient(#eee_0_25%,#fff_0_50%)] bg-[length:20px_20px] ${on ? "border-ink" : "border-ink/10"}`}>
+                <div className="aspect-square">
+                  {(t.preview_url ?? t.asset_url) ? (
+                    <img src={t.preview_url ?? t.asset_url ?? ""} alt={t.name} className="h-full w-full object-contain" />
+                  ) : null}
+                </div>
+                <div className={`absolute inset-x-0 bottom-0 flex items-center justify-between px-2 py-1 text-xs ${on ? "bg-ink text-cream" : "bg-cream/85 text-ink"}`}>
+                  <span className="truncate italic">{t.name}</span>
+                  <span>{on ? "✓" : "+"}</span>
+                </div>
+              </button>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  );
+}
