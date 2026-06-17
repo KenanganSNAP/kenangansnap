@@ -21,14 +21,12 @@ export const Route = createFileRoute("/_authenticated/dashboard/event/$id")({
 function ManageEvent() {
   const { id } = Route.useParams();
   const qc = useQueryClient();
-  const { data, isLoading, refetch } = useQuery({
+  const { data, isLoading } = useQuery({
     queryKey: ["event", id],
     queryFn: () => getEventForHost({ data: { id } }),
   });
-  const { data: audits = [] } = useQuery({ queryKey: ["event-audits", id], queryFn: () => listEventAuditsForHost({ data: { id } }) });
   const fileRef = useRef<HTMLInputElement>(null);
   const qrRef = useRef<HTMLDivElement>(null);
-  const [busy, setBusy] = useState(false);
   const [zipping, setZipping] = useState<"all" | "photos" | "voices" | null>(null);
 
   if (isLoading || !data) return <p className="py-10 text-ink/60">Loading…</p>;
@@ -41,13 +39,6 @@ function ManageEvent() {
   async function copy() {
     await navigator.clipboard.writeText(guestUrl);
     toast.success("Guest link copied");
-  }
-
-  async function toggle() {
-    setBusy(true);
-    await toggleEventActive({ data: { id: event.id, isActive: !event.is_active } });
-    await refetch();
-    setBusy(false);
   }
 
   async function uploadInvite(file: File) {
