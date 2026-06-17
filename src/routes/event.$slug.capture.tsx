@@ -6,6 +6,8 @@ import { FILTERS, getFilterCss, type FilterId } from "@/lib/filters";
 import { loadGuest } from "@/lib/guest-session";
 import { uploadPhoto } from "@/lib/kenangan.functions";
 import { listTemplatesForEvent, type TemplateRow } from "@/lib/templates.functions";
+import { getPrintConfigPublic } from "@/lib/print.functions";
+import { PrintOptionsSheet } from "@/components/print-options-sheet";
 import { RotateCcw, Circle, Printer } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
@@ -25,10 +27,16 @@ function Capture() {
   const [preview, setPreview] = useState<string | null>(null);
   const [originalPreview, setOriginalPreview] = useState<string | null>(null);
   const [templateId, setTemplateId] = useState<string | null>(null);
+  const [printOpen, setPrintOpen] = useState(false);
 
   const { data: templates = [] } = useQuery({
     queryKey: ["event-templates-public", slug],
     queryFn: () => listTemplatesForEvent({ data: { slug } }),
+  });
+
+  const { data: printCfg } = useQuery({
+    queryKey: ["print-config-public"],
+    queryFn: () => getPrintConfigPublic(),
   });
 
   function printPhoto() {
@@ -218,10 +226,27 @@ function Capture() {
               {busy ? "Sending…" : "Send to album"}
             </button>
           </div>
+          {printCfg?.enabled && (
+            <button onClick={() => setPrintOpen(true)}
+              className="flex w-full items-center justify-center gap-2 rounded-xl bg-ink/90 py-3 text-cream">
+              <Printer size={16} /> {t("booth.sendToPrinter")}
+            </button>
+          )}
           <button onClick={printPhoto} className="flex w-full items-center justify-center gap-2 rounded-xl border border-ink/15 bg-card py-3 text-ink">
-            <Printer size={16} /> {t("common.print")}
+            <Printer size={16} /> {t("booth.printLocal")}
           </button>
         </div>
+      )}
+      {printCfg?.enabled && (
+        <PrintOptionsSheet
+          open={printOpen}
+          onClose={() => setPrintOpen(false)}
+          config={printCfg}
+          slug={slug}
+          guestName={loadGuest(slug)?.name ?? ""}
+          templatedDataUrl={preview}
+          originalDataUrl={originalPreview}
+        />
       )}
     </div>
   );

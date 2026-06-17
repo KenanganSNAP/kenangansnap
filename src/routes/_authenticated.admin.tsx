@@ -12,6 +12,7 @@ function AdminLayout() {
     { to: "/admin/guests", label: "Guests" },
     { to: "/admin/media", label: "Media" },
     { to: "/admin/templates", label: "Templates" },
+    { to: "/admin/print", label: "Print" },
     { to: "/admin/homepage", label: "Homepage" },
   ];
   const pages = [

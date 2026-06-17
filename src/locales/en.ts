@@ -75,6 +75,7 @@ const en = {
     copies: "Copies",
     includeName: "Include guest name",
     sendToPrinter: "Send to printer",
+    printLocal: "Print on this device",
     printed: "Sent to printer",
     printFailed: "Could not reach the printer",
   },
