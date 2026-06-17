@@ -4,7 +4,8 @@ import { toast } from "sonner";
 import { FILTERS, getFilterCss, type FilterId } from "@/lib/filters";
 import { loadGuest } from "@/lib/guest-session";
 import { uploadPhoto } from "@/lib/kenangan.functions";
-import { RotateCcw, Circle } from "lucide-react";
+import { RotateCcw, Circle, Printer } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 export const Route = createFileRoute("/event/$slug/capture")({
   component: Capture,
@@ -13,12 +14,27 @@ export const Route = createFileRoute("/event/$slug/capture")({
 function Capture() {
   const { slug } = Route.useParams();
   const nav = useNavigate();
+  const { t } = useTranslation();
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const [filter, setFilter] = useState<FilterId>("warm");
   const [facing, setFacing] = useState<"user" | "environment">("environment");
   const [busy, setBusy] = useState(false);
   const [preview, setPreview] = useState<string | null>(null);
+
+  function printPhoto() {
+    if (!preview) return;
+    const w = window.open("", "_blank", "width=600,height=800");
+    if (!w) { toast.error("Pop-up blocked. Allow pop-ups to print."); return; }
+    w.document.write(`<!doctype html><html><head><title>Print</title><style>
+      @page { margin: 12mm; }
+      html,body{margin:0;padding:0;background:#fff;}
+      .wrap{display:flex;align-items:center;justify-content:center;min-height:100vh;}
+      img{max-width:100%;max-height:100vh;object-fit:contain;}
+      @media print { .wrap{min-height:auto;} }
+    </style></head><body><div class="wrap"><img src="${preview}" onload="setTimeout(()=>{window.focus();window.print();},100)"/></div></body></html>`);
+    w.document.close();
+  }
 
   useEffect(() => {
     const guest = loadGuest(slug);
@@ -113,10 +129,15 @@ function Capture() {
           </div>
         </>
       ) : (
-        <div className="mt-4 grid grid-cols-2 gap-2">
-          <button onClick={() => setPreview(null)} className="rounded-xl border border-ink/15 bg-card py-3">Retake</button>
-          <button disabled={busy} onClick={send} className="rounded-xl bg-ink py-3 text-cream disabled:opacity-50">
-            {busy ? "Sending…" : "Send to album"}
+        <div className="mt-4 space-y-2">
+          <div className="grid grid-cols-2 gap-2">
+            <button onClick={() => setPreview(null)} className="rounded-xl border border-ink/15 bg-card py-3">{t("booth.retake")}</button>
+            <button disabled={busy} onClick={send} className="rounded-xl bg-ink py-3 text-cream disabled:opacity-50">
+              {busy ? "Sending…" : "Send to album"}
+            </button>
+          </div>
+          <button onClick={printPhoto} className="flex w-full items-center justify-center gap-2 rounded-xl border border-ink/15 bg-card py-3 text-ink">
+            <Printer size={16} /> {t("common.print")}
           </button>
         </div>
       )}
