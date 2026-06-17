@@ -515,9 +515,33 @@ export const listHosts = createServerFn({ method: "GET" })
   .handler(async ({ context }) => {
     await requireAdmin(context);
     const { data, error } = await context.supabase.from("hosts")
-      .select("user_id, email, status, created_at").order("created_at", { ascending: false });
+      .select("user_id, email, status, full_name, phone, company, event_interest, contact_updated_at, created_at")
+      .order("created_at", { ascending: false });
     if (error) throw new Error(error.message);
     return data ?? [];
+  });
+
+export const adminUpdateHostContact = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { userId: string; full_name?: string | null; phone?: string | null; company?: string | null; event_interest?: string | null }) =>
+    z.object({
+      userId: z.string().uuid(),
+      full_name: z.string().trim().max(100).nullable().optional(),
+      phone: z.string().trim().max(30).nullable().optional(),
+      company: z.string().trim().max(100).nullable().optional(),
+      event_interest: z.string().trim().max(1000).nullable().optional(),
+    }).parse(d))
+  .handler(async ({ data, context }) => {
+    await requireAdmin(context);
+    const { error } = await context.supabase.from("hosts").update({
+      full_name: data.full_name ?? null,
+      phone: data.phone ?? null,
+      company: data.company ?? null,
+      event_interest: data.event_interest ?? null,
+      contact_updated_at: new Date().toISOString(),
+    }).eq("user_id", data.userId);
+    if (error) throw new Error(error.message);
+    return { ok: true };
   });
 
 export const setHostStatus = createServerFn({ method: "POST" })
