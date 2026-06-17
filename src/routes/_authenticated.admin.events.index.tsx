@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { listAllEvents, adminDeleteEvent } from "@/lib/kenangan.functions";
+import { StatusBadge } from "@/components/status-badge";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/admin/events/")({
