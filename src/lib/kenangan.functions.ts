@@ -68,13 +68,15 @@ export const registerGuest = createServerFn({ method: "POST" })
 
 // PUBLIC: Upload photo (data URL base64 from canvas)
 export const uploadPhoto = createServerFn({ method: "POST" })
-  .inputValidator((d: { slug: string; guestId: string; guestName: string; filter: string; dataUrl: string }) =>
+  .inputValidator((d: { slug: string; guestId: string; guestName: string; filter: string; dataUrl: string; originalDataUrl?: string | null; templateId?: string | null }) =>
     z.object({
       slug: z.string().min(1),
       guestId: z.string().uuid(),
       guestName: z.string().min(1).max(60),
       filter: z.string().max(20),
       dataUrl: z.string().startsWith("data:image/").max(20_000_000),
+      originalDataUrl: z.string().startsWith("data:image/").max(20_000_000).nullable().optional(),
+      templateId: z.string().uuid().nullable().optional(),
     }).parse(d),
   )
   .handler(async ({ data }) => {
@@ -84,16 +86,20 @@ export const uploadPhoto = createServerFn({ method: "POST" })
     if (eErr) throw new Error(eErr.message);
     if (!event || !event.is_active) throw new Error("Event not available");
 
-    const [meta, b64] = data.dataUrl.split(",");
-    const mime = meta.match(/data:(.*?);base64/)?.[1] ?? "image/jpeg";
-    const ext = mime.includes("png") ? "png" : "jpg";
-    const bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
-    const path = `${event.id}/${crypto.randomUUID()}.${ext}`;
+    async function uploadDataUrl(dataUrl: string) {
+      const [meta, b64] = dataUrl.split(",");
+      const mime = meta.match(/data:(.*?);base64/)?.[1] ?? "image/jpeg";
+      const ext = mime.includes("png") ? "png" : "jpg";
+      const bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+      const path = `${event!.id}/${crypto.randomUUID()}.${ext}`;
+      const { error } = await sb.storage.from("photos").upload(path, bytes, { contentType: mime, upsert: false });
+      if (error) throw new Error(error.message);
+      return path;
+    }
 
-    const { error: upErr } = await sb.storage.from("photos").upload(path, bytes, {
-      contentType: mime, upsert: false,
-    });
-    if (upErr) throw new Error(upErr.message);
+    const path = await uploadDataUrl(data.dataUrl);
+    let originalPath: string | null = null;
+    if (data.originalDataUrl) originalPath = await uploadDataUrl(data.originalDataUrl);
 
     const { error: insErr, data: row } = await sb.from("photos").insert({
       event_id: event.id,
@@ -102,6 +108,8 @@ export const uploadPhoto = createServerFn({ method: "POST" })
       storage_url: path,
       media_type: "photo",
       filter_applied: data.filter,
+      original_url: originalPath,
+      template_id: data.templateId ?? null,
     }).select("id").single();
     if (insErr) throw new Error(insErr.message);
     return { id: row.id };
