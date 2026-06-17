@@ -1,4 +1,5 @@
 import { createFileRoute, Link, Outlet, useLocation } from "@tanstack/react-router";
+import { HeaderControls } from "@/components/header-controls";
 
 export const Route = createFileRoute("/_authenticated/admin")({
   component: AdminLayout,
