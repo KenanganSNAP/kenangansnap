@@ -88,7 +88,7 @@ export const upsertTemplate = createServerFn({ method: "POST" })
     if (data.previewDataUrl) previewPath = await upload(data.previewDataUrl, "templates/previews");
 
     if (data.id) {
-      const update: Record<string, unknown> = {
+      const update: { name: string; kind: TemplateKind; is_active: boolean; updated_at: string; asset_path?: string; preview_path?: string } = {
         name: data.name, kind: data.kind, is_active: data.isActive,
         updated_at: new Date().toISOString(),
       };
