@@ -2,6 +2,7 @@ import { createFileRoute, Outlet, useLocation } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { getEventBySlug } from "@/lib/kenangan.functions";
 import { BottomNav } from "@/components/bottom-nav";
+import { HeaderControls } from "@/components/header-controls";
 
 export const Route = createFileRoute("/event/$slug")({
   component: EventLayout,
