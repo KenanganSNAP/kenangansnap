@@ -1,6 +1,6 @@
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link, Navigate, useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { listMyEvents } from "@/lib/kenangan.functions";
+import { listMyEvents, getMyHostStatus } from "@/lib/kenangan.functions";
 import { StatusBadge } from "@/components/status-badge";
 import { Plus, Calendar, Users, Camera, Mic, MessageSquare } from "lucide-react";
 
@@ -10,10 +10,19 @@ export const Route = createFileRoute("/_authenticated/dashboard/")({
 
 function Dashboard() {
   const nav = useNavigate();
+  const { data: hostStatus, isLoading: statusLoading } = useQuery({
+    queryKey: ["my-host-status"],
+    queryFn: () => getMyHostStatus(),
+  });
+  const approved = hostStatus?.status === "approved";
   const { data: events, isLoading } = useQuery({
     queryKey: ["my-events"],
     queryFn: () => listMyEvents(),
+    enabled: approved,
   });
+
+  if (statusLoading) return <p className="px-6 py-10 text-ink/60 dark:text-foreground/60">Loading…</p>;
+  if (!approved) return <Navigate to="/dashboard/pending" />;
 
   return (
     <div className="py-4">
