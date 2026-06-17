@@ -109,6 +109,19 @@ function AdminEventDetail() {
         </div>
       </section>
 
+      <section className="space-y-3 rounded-2xl border border-ink/10 bg-card p-5">
+        <h2 className="font-serif text-xl italic">Capacity limits</h2>
+        <p className="text-xs text-ink/55">Admin-only. Guests will be blocked once a cap is hit.</p>
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <NumberInput label="Max guests (min 50)" min={50} value={form.max_guests} onChange={(n) => setForm({ ...form, max_guests: n })} />
+          <NumberInput label="Max photos" min={1} value={form.max_photos} onChange={(n) => setForm({ ...form, max_photos: n })} />
+          <NumberInput label="Max notes" min={1} value={form.max_notes} onChange={(n) => setForm({ ...form, max_notes: n })} />
+          <NumberInput label="Max voice messages" min={1} value={form.max_voice} onChange={(n) => setForm({ ...form, max_voice: n })} />
+          <NumberInput label="Max prints" min={0} value={form.max_prints} onChange={(n) => setForm({ ...form, max_prints: n })} />
+        </div>
+      </section>
+
+
       <section className="rounded-2xl border border-ink/10 bg-card p-5">
         <h2 className="font-serif text-xl italic">Audit trail</h2>
         {audits.length === 0 ? (
