@@ -152,10 +152,7 @@ export const uploadVoice = createServerFn({ method: "POST" })
   )
   .handler(async ({ data }) => {
     const sb = publicClient();
-    const { data: event, error: eErr } = await sb.from("events")
-      .select("id, is_active").eq("slug", data.slug).maybeSingle();
-    if (eErr) throw new Error(eErr.message);
-    if (!event || !event.is_active) throw new Error("Event not available");
+    const event = await loadEventForGuestAction(sb, data.slug, { capTable: "memories", capCol: "max_voice", memoryType: "voice" });
 
     const [meta, b64] = data.dataUrl.split(",");
     const mime = meta.match(/data:(.*?);base64/)?.[1] ?? "audio/webm";
