@@ -7,7 +7,7 @@ import {
   getEventForHost, toggleEventActive, deletePhoto, deleteMemory, updateEventInvitation,
 } from "@/lib/kenangan.functions";
 import { listEventAuditsForHost } from "@/lib/admin-events.functions";
-import { listAllTemplatesPublic, getEventTemplates, setEventTemplates } from "@/lib/templates-host.functions";
+import { listActiveTemplates, getEventTemplates, setEventTemplates } from "@/lib/templates.functions";
 import { resizeImageToDataUrl } from "@/lib/image-resize";
 import { downloadFile, safeFilename } from "@/lib/download";
 import { exportZip } from "@/lib/zip-export";
