@@ -412,15 +412,8 @@ export const getEventForHost = createServerFn({ method: "GET" })
     };
   });
 
-export const toggleEventActive = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
-  .inputValidator((d: { id: string; isActive: boolean }) =>
-    z.object({ id: z.string().uuid(), isActive: z.boolean() }).parse(d))
-  .handler(async ({ data, context }) => {
-    const { error } = await context.supabase.from("events").update({ is_active: data.isActive }).eq("id", data.id);
-    if (error) throw new Error(error.message);
-    return { ok: true };
-  });
+// (toggleEventActive removed — status is admin-only via adminUpdateEvent)
+
 
 export const updateEventInvitation = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
