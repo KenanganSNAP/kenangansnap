@@ -222,6 +222,10 @@ function ManageEvent() {
         )}
       </Section>
 
+      <Section title="Photo templates">
+        <TemplatePicker eventId={event.id} />
+      </Section>
+
       <Section title="Guests">
         {guests.length === 0 ? <Empty msg="No guests yet" /> : (
           <ul className="flex flex-wrap gap-2">
