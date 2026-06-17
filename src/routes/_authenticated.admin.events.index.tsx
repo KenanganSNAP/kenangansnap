@@ -3,7 +3,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { listAllEvents, adminDeleteEvent } from "@/lib/kenangan.functions";
 import { toast } from "sonner";
 
-export const Route = createFileRoute("/_authenticated/admin/events")({
+export const Route = createFileRoute("/_authenticated/admin/events/")({
   component: AdminEvents,
 });
 

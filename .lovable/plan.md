@@ -1,35 +1,71 @@
-# Section 7 — Admin Guest Editing
+# Fix Studio control → Events: Edit & View buttons
 
-Reality check on the data model: `guests` table only has `name`, `event_id`, `session_token`, `created_at`. There's no email, phone, RSVP, or invitation system — guests join anonymously via QR code at the event. So I'll scope this section to what actually maps to the schema and explicitly defer the rest.
+## Root cause (Edit button)
 
-## In scope
+In TanStack file-based routing, when a route file has children, it acts as
+a **layout** for them. The layout's component MUST render `<Outlet />`,
+otherwise child routes match the URL but nothing appears on screen.
 
-### Per-event guest tab
-- Add a **Guests tab** to `/admin/events/$id` (currently shows host + counts + audit log). New tab strip: "Overview" (existing) / "Guests".
-- Guests view lists every guest for that event: name, joined time, photo count (already counted in overview), and per-row actions.
-- Actions per guest: **Edit name** (inline), **Delete** (with confirm).
+Current files:
+- `src/routes/_authenticated.admin.events.tsx` — renders the events table directly (no `<Outlet />`)
+- `src/routes/_authenticated.admin.events.$id.tsx` — child route
 
-### Global guest table upgrade
-- The existing `/admin/guests` (all guests across all events) gains the same **Edit name** inline action next to Delete.
-- Add a search box (filter by name / event title, client-side over the existing query) and a per-event filter dropdown.
+So clicking **Edit** navigates to `/admin/events/$id`, the parent matches,
+but because the parent component renders a table instead of `<Outlet />`,
+the edit page never mounts. The URL changes but the visible UI stays on
+the list (looks like nothing happened).
 
-### Server functions
-- `adminUpdateGuest({ guestId, name })` — `requireSupabaseAuth` + admin role check, validates name (1–60 chars), updates row, writes audit entry.
-- Reuse the existing `adminDeleteGuest`; extend it to write an audit entry on delete.
+## Root cause (View button)
 
-### Audit log generalisation
-- Migration adds `entity_type text not null default 'event'` and `entity_id uuid` to `event_audits`. Backfill: `update event_audits set entity_id = event_id where entity_id is null`.
-- Keep `event_id` for now (don't drop) so existing admin event detail UI keeps working unchanged.
-- Guest edits/deletes insert with `entity_type='guest'`, `entity_id=<guest_id>`, and the guest's `event_id` so they still surface on the event detail audit list.
-- Admin event detail audit list keeps current query (filtered by `event_id`); no UI change needed.
+The **View** link goes to `/event/$slug` — the guest-facing landing page
+that asks "What's your name?" before opening the camera. For an admin
+clicking from Studio control, this is the wrong destination: it isn't
+"viewing" the event, it's joining as a guest. They likely expect a
+preview of the live guest page without the registration gate, or to be
+sent to the host dashboard view of the event.
 
-### Files
-- New: `src/lib/admin-guests.functions.ts` (or extend `admin-events.functions.ts`), migration for `event_audits`.
-- Edit: `src/routes/_authenticated.admin.events.$id.tsx` (add tabs + guests panel), `src/routes/_authenticated.admin.guests.tsx` (edit + filter), small additions to en/ms locales.
+## Plan
 
-## Out of scope (deferred, explicit)
+### 1. Make the events list a true index route (fixes Edit)
 
-- **Email / phone / RSVP / resend invitation** — none of these fields exist on `guests`. Adding them is a separate feature ("guest contact + RSVP system") that requires schema, an email provider, and UI for both hosts and guests. I'll flag this as a future feature in the plan file rather than half-build it here.
-- **Bulk CSV import** — confirmed deferred earlier.
+- Rename `src/routes/_authenticated.admin.events.tsx` → `src/routes/_authenticated.admin.events.index.tsx` (no other changes — same component, still renders the table at `/admin/events`).
+- Create a new `src/routes/_authenticated.admin.events.tsx` containing just a layout that returns `<Outlet />`:
+  ```tsx
+  import { createFileRoute, Outlet } from "@tanstack/react-router";
+  export const Route = createFileRoute("/_authenticated/admin/events")({
+    component: () => <Outlet />,
+  });
+  ```
+- The route tree regenerates on save; `/admin/events` continues to render the table, and `/admin/events/$id` now mounts the edit page inside the layout.
 
-Reply "go" to build, or tell me to also scaffold the contact/RSVP fields now (will be a bigger change).
+### 2. Fix the View button destination
+
+Change the **View** link on the admin events list (and keep parity on
+the global admin pages if relevant) to open the event's guest landing
+page in a **new tab**, bypassing the "join as guest" expectation by
+making it clearly external/preview-style:
+
+```tsx
+<a href={`/event/${e.slug}`} target="_blank" rel="noopener noreferrer"
+   className="text-ink underline">View</a>
+```
+
+This keeps the existing public route (no extra code needed) but makes it
+obvious it's a preview of the public guest experience, not in-app
+navigation. The admin's edit view stays in-app via the Edit button.
+
+(If you'd prefer View to instead deep-link to the host dashboard
+`/dashboard/event/$id`, say the word and I'll wire that instead — but
+admins aren't necessarily the host, so RLS on `getEventForHost` would
+reject them, making the public guest page the safer "View".)
+
+## Files touched
+
+- `src/routes/_authenticated.admin.events.tsx` — replaced with `<Outlet />` layout
+- `src/routes/_authenticated.admin.events.index.tsx` — new file, holds the existing list UI
+- View link updated to `target="_blank"` on the events list
+
+## Out of scope
+
+- No DB / RLS changes (admin already has the needed policies).
+- No changes to the audit log, guests tab, or other admin pages.
