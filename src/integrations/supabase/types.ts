@@ -19,6 +19,8 @@ export type Database = {
           changed_fields: Json
           created_at: string
           edited_by: string | null
+          entity_id: string | null
+          entity_type: string
           event_id: string
           id: string
           note: string | null
@@ -27,6 +29,8 @@ export type Database = {
           changed_fields?: Json
           created_at?: string
           edited_by?: string | null
+          entity_id?: string | null
+          entity_type?: string
           event_id: string
           id?: string
           note?: string | null
@@ -35,6 +39,8 @@ export type Database = {
           changed_fields?: Json
           created_at?: string
           edited_by?: string | null
+          entity_id?: string | null
+          entity_type?: string
           event_id?: string
           id?: string
           note?: string | null
