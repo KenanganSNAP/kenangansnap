@@ -18,7 +18,6 @@ function AdminHosts() {
   const qc = useQueryClient();
   const { data, isLoading } = useQuery({ queryKey: ["admin-hosts"], queryFn: () => listHosts() });
   const { data: admins } = useQuery({ queryKey: ["admin-admins"], queryFn: () => listAdmins() });
-  const { data: prefs } = useQuery({ queryKey: ["admin-prefs"], queryFn: () => getMyAdminPrefs() });
   const [adminEmail, setAdminEmail] = useState("");
   const [granting, setGranting] = useState(false);
   const [editing, setEditing] = useState<HostRow | null>(null);
@@ -54,11 +53,6 @@ function AdminHosts() {
       qc.invalidateQueries({ queryKey: ["admin-admins"] });
     } catch (err) { toast.error((err as Error).message); }
   }
-  async function toggleNotify(next: boolean) {
-    await updateMyAdminPrefs({ data: { notify_new_signups: next } });
-    qc.invalidateQueries({ queryKey: ["admin-prefs"] });
-    toast.success(next ? "Notifications on" : "Notifications off");
-  }
 
   if (isLoading) return <p className="text-ink/60">Loading…</p>;
 
@@ -66,23 +60,13 @@ function AdminHosts() {
 
   return (
     <div className="space-y-6">
-      <section className="rounded-2xl border border-ink/10 bg-card p-5">
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <h2 className="font-serif text-xl italic">Notification preferences</h2>
-            <p className="mt-1 text-sm text-ink/65">Email me when a new host signs up and needs approval.</p>
-          </div>
-          <button
-            onClick={() => toggleNotify(!prefs?.notify_new_signups)}
-            className={`inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm ${
-              prefs?.notify_new_signups
-                ? "bg-emerald-600/10 text-emerald-700"
-                : "bg-ink/5 text-ink/60"
-            }`}
-          >
-            {prefs?.notify_new_signups ? <><Bell size={14} /> On</> : <><BellOff size={14} /> Off</>}
-          </button>
-        </div>
+      <section className="rounded-2xl border border-amber-500/20 bg-amber-500/5 p-5">
+        <h2 className="font-serif text-xl italic">New signups</h2>
+        <p className="mt-1 text-sm text-ink/70">
+          {pendingCount > 0
+            ? `${pendingCount} host${pendingCount === 1 ? "" : "s"} awaiting your approval — see highlighted rows below. The bell badge in the header also shows the live count.`
+            : "No pending hosts right now. New signups land here for approval, and the bell badge in the header lights up when they arrive."}
+        </p>
       </section>
 
       <section className="rounded-2xl border border-ink/10 bg-card p-5">
