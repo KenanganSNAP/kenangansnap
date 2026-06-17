@@ -498,7 +498,7 @@ export const listAllEvents = createServerFn({ method: "GET" })
   .handler(async ({ context }) => {
     await requireAdmin(context);
     const { data: events, error } = await context.supabase.from("events")
-      .select("id, slug, title, event_type, date, venue, is_active, host_id, created_at")
+      .select("id, slug, title, event_type, date, venue, status, host_id, created_at")
       .order("created_at", { ascending: false });
     if (error) throw new Error(error.message);
     const { data: hosts } = await context.supabase.from("hosts").select("user_id, email");
