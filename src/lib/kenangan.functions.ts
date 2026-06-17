@@ -333,7 +333,6 @@ export const createEvent = createServerFn({ method: "POST" })
       venue: data.venue,
       welcome_message: data.welcomeMessage,
       reveal_at: data.revealAt,
-      is_active: true,
       custom_data: (data.customData ?? {}) as never,
     }).select("id, slug").single();
     if (error) throw new Error(error.message);
