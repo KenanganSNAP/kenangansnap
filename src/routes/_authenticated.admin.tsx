@@ -33,6 +33,7 @@ function AdminLayout() {
         </div>
         <HeaderControls />
       </div>
+      <div className="mt-5 flex flex-wrap gap-1 rounded-full border border-ink/10 bg-card p-1 text-sm">
         {tabs.map((t) => {
           const active = loc.pathname === t.to;
           return (
