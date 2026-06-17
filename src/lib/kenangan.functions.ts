@@ -188,8 +188,7 @@ export const submitNote = createServerFn({ method: "POST" })
   )
   .handler(async ({ data }) => {
     const sb = publicClient();
-    const { data: event } = await sb.from("events").select("id, is_active").eq("slug", data.slug).maybeSingle();
-    if (!event || !event.is_active) throw new Error("Event not available");
+    const event = await loadEventForGuestAction(sb, data.slug, { capTable: "memories", capCol: "max_notes", memoryType: "note" });
     const { error, data: row } = await sb.from("memories").insert({
       event_id: event.id,
       guest_id: data.guestId,
