@@ -39,10 +39,10 @@ Building sections 2, 3, 4, 5, 7 on top of Phase 1. Each section is scoped so we 
 
 I'll build in this order and stop for your approval between each:
 
-1. Section 5 (dark mode + i18n) — touches the whole UI, best to land first so later screens are translated as built.
-2. Section 4 (customisable Create Event form).
-3. Section 2 (photo templates).
-4. Section 3 (print integration).
+1. ✅ Section 5 (dark mode + i18n) — shipped.
+2. ✅ Section 4 (customisable Create Event form) — shipped.
+3. ✅ Section 2 (photo templates) — shipped (admin catalog at /admin/templates, host picker on event page, booth picker with client-side canvas compositing, print button on capture preview).
+4. Section 3 (print integration with configurable printer URL + copies/include-name options).
 5. Section 7 (admin guest editing + audit generalisation).
 
 ## Things I'd like you to confirm or add
