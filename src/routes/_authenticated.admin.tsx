@@ -11,6 +11,7 @@ function AdminLayout() {
     { to: "/admin/events", label: "Events" },
     { to: "/admin/guests", label: "Guests" },
     { to: "/admin/media", label: "Media" },
+    { to: "/admin/templates", label: "Templates" },
     { to: "/admin/homepage", label: "Homepage" },
   ];
   const pages = [
