@@ -25,6 +25,7 @@ import { Route as EventSlugVoiceRouteImport } from './routes/event.$slug.voice'
 import { Route as EventSlugNotesRouteImport } from './routes/event.$slug.notes'
 import { Route as EventSlugCaptureRouteImport } from './routes/event.$slug.capture'
 import { Route as EventSlugAlbumRouteImport } from './routes/event.$slug.album'
+import { Route as AuthenticatedDashboardPendingRouteImport } from './routes/_authenticated.dashboard.pending'
 import { Route as AuthenticatedDashboardCreateRouteImport } from './routes/_authenticated.dashboard.create'
 import { Route as AuthenticatedAdminTemplatesRouteImport } from './routes/_authenticated.admin.templates'
 import { Route as AuthenticatedAdminPrintRouteImport } from './routes/_authenticated.admin.print'
@@ -120,6 +121,12 @@ const EventSlugAlbumRoute = EventSlugAlbumRouteImport.update({
   path: '/album',
   getParentRoute: () => EventSlugRoute,
 } as any)
+const AuthenticatedDashboardPendingRoute =
+  AuthenticatedDashboardPendingRouteImport.update({
+    id: '/pending',
+    path: '/pending',
+    getParentRoute: () => AuthenticatedDashboardRoute,
+  } as any)
 const AuthenticatedDashboardCreateRoute =
   AuthenticatedDashboardCreateRouteImport.update({
     id: '/create',
@@ -219,6 +226,7 @@ export interface FileRoutesByFullPath {
   '/admin/print': typeof AuthenticatedAdminPrintRoute
   '/admin/templates': typeof AuthenticatedAdminTemplatesRoute
   '/dashboard/create': typeof AuthenticatedDashboardCreateRoute
+  '/dashboard/pending': typeof AuthenticatedDashboardPendingRoute
   '/event/$slug/album': typeof EventSlugAlbumRoute
   '/event/$slug/capture': typeof EventSlugCaptureRoute
   '/event/$slug/notes': typeof EventSlugNotesRoute
@@ -246,6 +254,7 @@ export interface FileRoutesByTo {
   '/admin/print': typeof AuthenticatedAdminPrintRoute
   '/admin/templates': typeof AuthenticatedAdminTemplatesRoute
   '/dashboard/create': typeof AuthenticatedDashboardCreateRoute
+  '/dashboard/pending': typeof AuthenticatedDashboardPendingRoute
   '/event/$slug/album': typeof EventSlugAlbumRoute
   '/event/$slug/capture': typeof EventSlugCaptureRoute
   '/event/$slug/notes': typeof EventSlugNotesRoute
@@ -279,6 +288,7 @@ export interface FileRoutesById {
   '/_authenticated/admin/print': typeof AuthenticatedAdminPrintRoute
   '/_authenticated/admin/templates': typeof AuthenticatedAdminTemplatesRoute
   '/_authenticated/dashboard/create': typeof AuthenticatedDashboardCreateRoute
+  '/_authenticated/dashboard/pending': typeof AuthenticatedDashboardPendingRoute
   '/event/$slug/album': typeof EventSlugAlbumRoute
   '/event/$slug/capture': typeof EventSlugCaptureRoute
   '/event/$slug/notes': typeof EventSlugNotesRoute
@@ -312,6 +322,7 @@ export interface FileRouteTypes {
     | '/admin/print'
     | '/admin/templates'
     | '/dashboard/create'
+    | '/dashboard/pending'
     | '/event/$slug/album'
     | '/event/$slug/capture'
     | '/event/$slug/notes'
@@ -339,6 +350,7 @@ export interface FileRouteTypes {
     | '/admin/print'
     | '/admin/templates'
     | '/dashboard/create'
+    | '/dashboard/pending'
     | '/event/$slug/album'
     | '/event/$slug/capture'
     | '/event/$slug/notes'
@@ -371,6 +383,7 @@ export interface FileRouteTypes {
     | '/_authenticated/admin/print'
     | '/_authenticated/admin/templates'
     | '/_authenticated/dashboard/create'
+    | '/_authenticated/dashboard/pending'
     | '/event/$slug/album'
     | '/event/$slug/capture'
     | '/event/$slug/notes'
@@ -510,6 +523,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/event/$slug/album'
       preLoaderRoute: typeof EventSlugAlbumRouteImport
       parentRoute: typeof EventSlugRoute
+    }
+    '/_authenticated/dashboard/pending': {
+      id: '/_authenticated/dashboard/pending'
+      path: '/pending'
+      fullPath: '/dashboard/pending'
+      preLoaderRoute: typeof AuthenticatedDashboardPendingRouteImport
+      parentRoute: typeof AuthenticatedDashboardRoute
     }
     '/_authenticated/dashboard/create': {
       id: '/_authenticated/dashboard/create'
@@ -663,6 +683,7 @@ const AuthenticatedAdminRouteWithChildren =
 
 interface AuthenticatedDashboardRouteChildren {
   AuthenticatedDashboardCreateRoute: typeof AuthenticatedDashboardCreateRoute
+  AuthenticatedDashboardPendingRoute: typeof AuthenticatedDashboardPendingRoute
   AuthenticatedDashboardIndexRoute: typeof AuthenticatedDashboardIndexRoute
   AuthenticatedDashboardEventIdRoute: typeof AuthenticatedDashboardEventIdRoute
 }
@@ -670,6 +691,7 @@ interface AuthenticatedDashboardRouteChildren {
 const AuthenticatedDashboardRouteChildren: AuthenticatedDashboardRouteChildren =
   {
     AuthenticatedDashboardCreateRoute: AuthenticatedDashboardCreateRoute,
+    AuthenticatedDashboardPendingRoute: AuthenticatedDashboardPendingRoute,
     AuthenticatedDashboardIndexRoute: AuthenticatedDashboardIndexRoute,
     AuthenticatedDashboardEventIdRoute: AuthenticatedDashboardEventIdRoute,
   }
