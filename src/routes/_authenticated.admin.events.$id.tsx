@@ -247,3 +247,12 @@ function Select({ label, value, options, onChange }: { label: string; value: str
     </label>
   );
 }
+
+function NumberInput({ label, value, onChange, min }: { label: string; value: number; onChange: (n: number) => void; min?: number }) {
+  return (
+    <label className="block">
+      <span className="text-xs uppercase tracking-wider text-ink/60">{label}</span>
+      <input type="number" min={min} value={value} onChange={(e) => onChange(Math.max(min ?? 0, Number(e.target.value) || 0))} className="mt-1 w-full rounded-xl border border-ink/15 bg-cream/70 px-4 py-2.5 text-sm" />
+    </label>
+  );
+}
