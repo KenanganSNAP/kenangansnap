@@ -1,6 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { listMyEvents } from "@/lib/kenangan.functions";
+import { StatusBadge } from "@/components/status-badge";
 import { Plus, Calendar, Users, Camera, Mic, MessageSquare } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/dashboard/")({
