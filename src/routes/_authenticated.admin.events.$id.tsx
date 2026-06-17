@@ -18,6 +18,11 @@ type EditableValues = {
   welcome_message: string | null;
   reveal_at: string | null;
   status: "draft" | "active" | "completed" | "cancelled";
+  max_guests: number;
+  max_photos: number;
+  max_notes: number;
+  max_voice: number;
+  max_prints: number;
 };
 
 function toDateInput(v: string | null) { return v ? v.slice(0, 10) : ""; }
@@ -36,7 +41,12 @@ function AdminEventDetail() {
       setForm({
         title: e.title, event_type: e.event_type as EditableValues["event_type"],
         date: e.date, venue: e.venue, welcome_message: e.welcome_message,
-        reveal_at: e.reveal_at, status: (e.status as EditableValues["status"]) ?? "active",
+        reveal_at: e.reveal_at, status: (e.status as EditableValues["status"]) ?? "draft",
+        max_guests: e.max_guests ?? 50,
+        max_photos: e.max_photos ?? 100,
+        max_notes: e.max_notes ?? 100,
+        max_voice: e.max_voice ?? 50,
+        max_prints: e.max_prints ?? 20,
       });
     }
   }, [data, form]);
