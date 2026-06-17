@@ -14,6 +14,27 @@ export type Database = {
   }
   public: {
     Tables: {
+      admin_notification_prefs: {
+        Row: {
+          created_at: string
+          notify_new_signups: boolean
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          notify_new_signups?: boolean
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          notify_new_signups?: boolean
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       event_audits: {
         Row: {
           changed_fields: Json
@@ -230,20 +251,35 @@ export type Database = {
       }
       hosts: {
         Row: {
+          company: string | null
+          contact_updated_at: string | null
           created_at: string
           email: string
+          event_interest: string | null
+          full_name: string | null
+          phone: string | null
           status: string
           user_id: string
         }
         Insert: {
+          company?: string | null
+          contact_updated_at?: string | null
           created_at?: string
           email: string
+          event_interest?: string | null
+          full_name?: string | null
+          phone?: string | null
           status?: string
           user_id: string
         }
         Update: {
+          company?: string | null
+          contact_updated_at?: string | null
           created_at?: string
           email?: string
+          event_interest?: string | null
+          full_name?: string | null
+          phone?: string | null
           status?: string
           user_id?: string
         }
