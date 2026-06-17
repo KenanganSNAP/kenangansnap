@@ -45,6 +45,17 @@ async function rowsToTemplates(sb: ReturnType<typeof publicClient>, rows: { id: 
   })));
 }
 
+// PUBLIC: list active templates (used by hosts to pick + public anywhere needed)
+export const listActiveTemplates = createServerFn({ method: "GET" })
+  .handler(async (): Promise<TemplateRow[]> => {
+    const sb = publicClient();
+    const { data, error } = await sb.from("photo_templates")
+      .select("id, name, kind, preview_path, asset_path, is_active, sort_order")
+      .eq("is_active", true).order("sort_order", { ascending: true });
+    if (error) throw new Error(error.message);
+    return rowsToTemplates(sb, data ?? []);
+  });
+
 // ===== ADMIN catalog =====
 export const listAllTemplates = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
