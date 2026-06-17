@@ -29,10 +29,11 @@ async function loadEventForGuestAction(
     throw new Error("Event not available");
   }
   if (opts.capTable && opts.capCol) {
-    let q = sb.from(opts.capTable).select("id", { count: "exact", head: true }).eq("event_id", event.id);
-    if (opts.capTable === "memories" && opts.memoryType) q = q.eq("type", opts.memoryType);
-    const { count } = await q;
-    const cap = (event as Record<string, number>)[opts.capCol];
+    const base = sb.from(opts.capTable).select("id", { count: "exact", head: true }).eq("event_id", event.id);
+    const { count } = opts.capTable === "memories" && opts.memoryType
+      ? await sb.from("memories").select("id", { count: "exact", head: true }).eq("event_id", event.id).eq("type", opts.memoryType)
+      : await base;
+    const cap = (event as unknown as Record<string, number>)[opts.capCol];
     if ((count ?? 0) >= cap) {
       const noun = opts.capCol === "max_guests" ? "Guest list" : opts.capCol === "max_photos" ? "Photo limit" : opts.capCol === "max_notes" ? "Note limit" : "Voice message limit";
       throw new Error(`${noun} reached`);
