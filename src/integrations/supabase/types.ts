@@ -252,6 +252,7 @@ export type Database = {
       hosts: {
         Row: {
           company: string | null
+          contact_submitted: boolean
           contact_updated_at: string | null
           created_at: string
           email: string
@@ -263,6 +264,7 @@ export type Database = {
         }
         Insert: {
           company?: string | null
+          contact_submitted?: boolean
           contact_updated_at?: string | null
           created_at?: string
           email: string
@@ -274,6 +276,7 @@ export type Database = {
         }
         Update: {
           company?: string | null
+          contact_submitted?: boolean
           contact_updated_at?: string | null
           created_at?: string
           email?: string
