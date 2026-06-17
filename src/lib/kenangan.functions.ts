@@ -303,6 +303,62 @@ export const getMyHostStatus = createServerFn({ method: "GET" })
     };
   });
 
+// AUTHED: full host row (for pending page contact form)
+export const getMyHost = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { data, error } = await context.supabase.from("hosts")
+      .select("user_id, email, status, full_name, phone, company, event_interest, contact_updated_at, created_at")
+      .eq("user_id", context.userId).maybeSingle();
+    if (error) throw new Error(error.message);
+    return data;
+  });
+
+const contactSchema = z.object({
+  full_name: z.string().trim().max(100).nullable().optional(),
+  phone: z.string().trim().max(30).nullable().optional(),
+  company: z.string().trim().max(100).nullable().optional(),
+  event_interest: z.string().trim().max(1000).nullable().optional(),
+});
+
+// AUTHED: host updates own contact info
+export const updateMyContactInfo = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { full_name?: string | null; phone?: string | null; company?: string | null; event_interest?: string | null }) => contactSchema.parse(d))
+  .handler(async ({ data, context }) => {
+    const { error } = await context.supabase.from("hosts").update({
+      full_name: data.full_name ?? null,
+      phone: data.phone ?? null,
+      company: data.company ?? null,
+      event_interest: data.event_interest ?? null,
+      contact_updated_at: new Date().toISOString(),
+    }).eq("user_id", context.userId);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+// AUTHED admin: get & update own notification prefs
+export const getMyAdminPrefs = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { data } = await context.supabase.from("admin_notification_prefs")
+      .select("notify_new_signups").eq("user_id", context.userId).maybeSingle();
+    return { notify_new_signups: data?.notify_new_signups ?? true };
+  });
+
+export const updateMyAdminPrefs = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { notify_new_signups: boolean }) =>
+    z.object({ notify_new_signups: z.boolean() }).parse(d))
+  .handler(async ({ data, context }) => {
+    const { error } = await context.supabase.from("admin_notification_prefs").upsert({
+      user_id: context.userId,
+      notify_new_signups: data.notify_new_signups,
+    }, { onConflict: "user_id" });
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
 // AUTHED: Create event
 export const createEvent = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
