@@ -4,10 +4,9 @@ import { useEffect, useState } from "react";
 import {
   listHosts, setHostStatus, deleteHost, adminUpdateHostContact,
   listAdmins, grantAdminByEmail, revokeAdmin,
-  getMyAdminPrefs, updateMyAdminPrefs,
 } from "@/lib/kenangan.functions";
 import { toast } from "sonner";
-import { Bell, BellOff, X } from "lucide-react";
+import { X } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/admin/")({
   component: AdminHosts,
