@@ -36,9 +36,12 @@ export const getAdminEventDetail = createServerFn({ method: "GET" })
     };
   });
 
-const editableFields = ["title", "event_type", "date", "venue", "welcome_message", "reveal_at", "is_active", "status"] as const;
+const editableFields = [
+  "title", "event_type", "date", "venue", "welcome_message", "reveal_at", "status",
+  "max_guests", "max_photos", "max_notes", "max_voice", "max_prints",
+] as const;
 type EditableKey = typeof editableFields[number];
-type EditableValues = Partial<Record<EditableKey, string | boolean | null>>;
+type EditableValues = Partial<Record<EditableKey, string | number | null>>;
 
 export const adminUpdateEvent = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -52,8 +55,12 @@ export const adminUpdateEvent = createServerFn({ method: "POST" })
         venue: z.string().max(200).nullable().optional(),
         welcome_message: z.string().max(500).nullable().optional(),
         reveal_at: z.string().nullable().optional(),
-        is_active: z.boolean().optional(),
         status: z.enum(["draft", "active", "completed", "cancelled"]).optional(),
+        max_guests: z.number().int().min(50).max(100000).optional(),
+        max_photos: z.number().int().min(1).max(100000).optional(),
+        max_notes:  z.number().int().min(1).max(100000).optional(),
+        max_voice:  z.number().int().min(1).max(100000).optional(),
+        max_prints: z.number().int().min(0).max(100000).optional(),
       }),
     }).parse(d))
   .handler(async ({ data, context }) => {
@@ -61,14 +68,10 @@ export const adminUpdateEvent = createServerFn({ method: "POST" })
     const { data: before, error: beforeErr } = await context.supabase.from("events").select("*").eq("id", data.id).maybeSingle();
     if (beforeErr) throw new Error(beforeErr.message);
     if (!before) throw new Error("Event not found");
-    type EventRow = Record<EditableKey, string | boolean | null>;
+    type EventRow = Record<EditableKey, string | number | null>;
     const beforeRow = before as unknown as EventRow;
 
     const changes = { ...data.changes };
-    // Keep is_active in sync with status if status changed
-    if (changes.status !== undefined && changes.is_active === undefined) {
-      changes.is_active = changes.status === "active";
-    }
     const diff: Record<string, { from: unknown; to: unknown }> = {};
     for (const k of Object.keys(changes) as EditableKey[]) {
       const newVal = changes[k];
@@ -89,17 +92,4 @@ export const adminUpdateEvent = createServerFn({ method: "POST" })
     });
     if (auditErr) throw new Error(auditErr.message);
     return { ok: true, changed: Object.keys(diff).length };
-  });
-
-export const listEventAuditsForHost = createServerFn({ method: "GET" })
-  .middleware([requireSupabaseAuth])
-  .inputValidator((d: { id: string }) => z.object({ id: z.string().uuid() }).parse(d))
-  .handler(async ({ data, context }) => {
-    const { data: audits, error } = await context.supabase
-      .from("event_audits")
-      .select("id, changed_fields, note, created_at")
-      .eq("event_id", data.id)
-      .order("created_at", { ascending: false });
-    if (error) throw new Error(error.message);
-    return audits ?? [];
   });
