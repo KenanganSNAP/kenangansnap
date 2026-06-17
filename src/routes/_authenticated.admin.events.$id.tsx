@@ -118,9 +118,86 @@ function AdminEventDetail() {
           </ul>
         )}
       </section>
+      </>
+      )}
     </div>
   );
 }
+
+function GuestsPanel({ eventId }: { eventId: string }) {
+  const qc = useQueryClient();
+  const { data, isLoading } = useQuery({
+    queryKey: ["admin-event-guests", eventId],
+    queryFn: () => listEventGuestsForAdmin({ data: { eventId } }),
+  });
+  const [editing, setEditing] = useState<{ id: string; name: string } | null>(null);
+
+  async function save() {
+    if (!editing) return;
+    try {
+      await adminUpdateGuest({ data: { guestId: editing.id, name: editing.name } });
+      toast.success("Guest updated");
+      setEditing(null);
+      qc.invalidateQueries({ queryKey: ["admin-event-guests", eventId] });
+      qc.invalidateQueries({ queryKey: ["admin-event", eventId] });
+    } catch (err) { toast.error((err as Error).message); }
+  }
+
+  async function remove(id: string, name: string) {
+    if (!confirm(`Delete guest "${name}"?`)) return;
+    try {
+      await adminDeleteGuest({ data: { guestId: id } });
+      toast.success("Guest deleted");
+      qc.invalidateQueries({ queryKey: ["admin-event-guests", eventId] });
+      qc.invalidateQueries({ queryKey: ["admin-event", eventId] });
+    } catch (err) { toast.error((err as Error).message); }
+  }
+
+  if (isLoading) return <p className="text-ink/60">Loading guests…</p>;
+  const guests = data ?? [];
+  return (
+    <div className="overflow-hidden rounded-2xl border border-ink/10 bg-card">
+      <table className="w-full text-sm">
+        <thead className="bg-cream-deep/60 text-left text-[10px] uppercase tracking-wider text-ink/60">
+          <tr><th className="px-4 py-3">Guest</th><th>Photos</th><th>Joined</th><th className="px-4 text-right">Actions</th></tr>
+        </thead>
+        <tbody>
+          {guests.map((g) => {
+            const isEditing = editing?.id === g.id;
+            return (
+              <tr key={g.id} className="border-t border-ink/5">
+                <td className="px-4 py-3 font-serif italic">
+                  {isEditing ? (
+                    <input value={editing!.name} onChange={(e) => setEditing({ ...editing!, name: e.target.value })}
+                      autoFocus className="rounded-lg border border-ink/20 bg-cream/70 px-2 py-1 text-sm not-italic" />
+                  ) : g.name}
+                </td>
+                <td className="text-ink/70">{g.photo_count}</td>
+                <td className="text-ink/60">{new Date(g.created_at).toLocaleString()}</td>
+                <td className="px-4 py-3 text-right">
+                  {isEditing ? (
+                    <div className="inline-flex gap-1">
+                      <button onClick={save} className="grid h-7 w-7 place-items-center rounded-full bg-ink text-cream"><Check size={14} /></button>
+                      <button onClick={() => setEditing(null)} className="grid h-7 w-7 place-items-center rounded-full border border-ink/15"><X size={14} /></button>
+                    </div>
+                  ) : (
+                    <div className="inline-flex gap-2">
+                      <button onClick={() => setEditing({ id: g.id, name: g.name })}
+                        className="inline-flex items-center gap-1 rounded-full bg-ink/5 px-3 py-1 text-ink/70"><Pencil size={12} /> Edit</button>
+                      <button onClick={() => remove(g.id, g.name)} className="rounded-full bg-red-600/10 px-3 py-1 text-red-700">Delete</button>
+                    </div>
+                  )}
+                </td>
+              </tr>
+            );
+          })}
+          {guests.length === 0 && <tr><td colSpan={4} className="px-4 py-10 text-center text-ink/55">No guests yet</td></tr>}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 
 function Stat({ label, value }: { label: string; value: number }) {
   return <div className="rounded-2xl border border-ink/10 bg-card p-4 text-center"><div className="text-2xl font-semibold">{value}</div><div className="text-[10px] uppercase tracking-wider text-ink/55">{label}</div></div>;
