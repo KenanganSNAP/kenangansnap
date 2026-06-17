@@ -1,56 +1,63 @@
 ## Goal
-
-New hosts must submit their contact information first. Only after submission does the host become visible/approvable in the admin panel with their details shown.
+On `/auth`, when a new user chooses to sign up, show the **contact details form first** (step 1), then the **email/password account creation** (step 2). Sign-in flow stays unchanged.
 
 ## Flow
 
-1. New user signs up → `hosts.status = 'pending'` (already the case), plus a new sub-state `contact_submitted = false`.
-2. Pending page (`/dashboard/pending`) shows the contact form with required fields. The "Approval requested" / waiting-for-admin copy is **hidden** until the form is submitted.
-3. On submit → set `contact_submitted = true`, stamp `contact_updated_at`, switch the pending page to the "waiting for admin approval" view (read-only summary of what they submitted, with an "Edit" toggle).
-4. Admin panel hosts list:
-   - **Hides** pending hosts who have not yet submitted contact info (or shows them in a collapsed "Awaiting contact info" section, greyed out, no Approve button).
-   - **Shows** pending hosts who have submitted, with full contact details and the Approve / Suspend / Edit Contact actions already in place.
-   - Bell badge count in the admin header changes to count only `pending + contact_submitted = true` (actionable pending), so admins aren't pinged for users who haven't filled the form yet.
+```text
+Click "Host an event"
+        ↓
+   /auth (signin)
+        ↓ "Create an account"
+   Step 1 — Contact details
+   • Full name (required)
+   • Phone / WhatsApp (required)
+   • Company / organization (optional)
+   • Event interest (required, textarea)
+        ↓ "Continue →"
+   Step 2 — Account
+   • Email (required)
+   • Password (required, min 6)
+        ↓ "Create account →"
+   supabase.auth.signUp(email, password)
+        ↓ session established
+   updateMyContactInfo({ ...step1, submit: true })
+        ↓
+   Redirect to /dashboard → bounced to /dashboard/pending
+   (shows read-only "Awaiting Approval" summary with Edit option)
+```
 
-## Database (one migration)
+## Changes
 
-- Add `contact_submitted boolean NOT NULL DEFAULT false` to `public.hosts`.
-- Update the host RLS update policy so a host can flip `contact_submitted` to true only when required fields (`full_name`, `phone`, `event_interest`) are non-empty; cannot flip it back to false (admin can, via service role / admin policy).
-- Backfill existing approved hosts to `contact_submitted = true` so they aren't hidden retroactively.
+**`src/routes/auth.tsx`** (only file with UI changes)
+- Add `signupStep` state (`"contact" | "account"`) — defaults to `"contact"` when `mode === "signup"`.
+- Add state for `fullName`, `phone`, `company`, `eventInterest`.
+- When `mode === "signin"`: render existing email/password form as-is.
+- When `mode === "signup"` and `signupStep === "contact"`:
+  - Render the contact form fields.
+  - "Continue →" button validates required fields client-side, then sets `signupStep = "account"`.
+  - Show a small step indicator ("Step 1 of 2 — Your details").
+  - Hide the Google button on step 1 (Google sign-in needs a different flow since it skips email/password — see below).
+- When `mode === "signup"` and `signupStep === "account"`:
+  - Render email + password fields.
+  - "Back" link returns to step 1 (preserves entered values).
+  - On submit: call `supabase.auth.signUp`, then once the session exists call `updateMyContactInfo({ full_name, phone, company, event_interest, submit: true })`, then navigate to `/dashboard` (pending page takes over).
+  - Step indicator: "Step 2 of 2 — Account".
+- Toggling back to "Sign in" clears the signup state cleanly.
 
-## Server functions (`src/lib/kenangan.functions.ts`)
+**Google OAuth on signup**
+- Google users come back authenticated with no contact info yet. They'll land on `/dashboard/pending` and fill the existing form there — no change needed.
+- Keep the Google button visible on the sign-in view and on signup step 2; hide on step 1 to avoid bypassing the contact step in the email/password flow.
 
-- `updateMyContactInfo`: extend to accept a `submit: boolean` flag. When `submit` is true, validate required fields with Zod (full_name 1–100, phone 5–30, company 0–100, event_interest 1–1000) and set `contact_submitted = true`.
-- `getMyHost`: already returns the host row; add `contact_submitted` to the projection.
-- `listHosts` (admin): add a `filter` param (`all` | `awaiting_contact` | `ready_for_review` | `approved` | `suspended`) and include `contact_submitted` in results. Default UI tab = "Ready for review".
-- `adminUpdateHostContact`: unchanged behavior, just continues to work.
-- Bell count query (`pendingCount`): change to `status = 'pending' AND contact_submitted = true`.
+## What does NOT change
+- `updateMyContactInfo` server function (already accepts `submit: true` and validates required fields).
+- `/dashboard/pending` page (still the fallback for Google signups and for edits).
+- Admin tabs and notification counts (still keyed off `contact_submitted`).
+- No database changes.
 
-## UI changes
+## Validation
+- Client-side: required fields enforced before allowing "Continue →".
+- Server-side: `updateMyContactInfo` already validates `full_name`, `phone`, `event_interest` when `submit: true`.
 
-- `src/routes/_authenticated.dashboard.pending.tsx`:
-  - Two states driven by `host.contact_submitted`:
-    - **Not submitted**: headline "Tell us about your event", contact form, "Submit for approval" button (disabled until required fields valid).
-    - **Submitted & still pending**: headline "Thanks — your request is with our team", read-only summary card, "Edit details" button that flips back to the form (keeps `contact_submitted = true`; admin already saw it, edits just update fields).
-  - Remove the current "waiting for approval" copy from the not-submitted state.
-
-- `src/routes/_authenticated.admin.index.tsx`:
-  - Add a tab/segment switcher above the hosts table: **Ready for review** (default) · **Awaiting contact info** · **Approved** · **Suspended** · **All**.
-  - "Ready for review" rows show full contact columns + Approve / Suspend / Edit Contact.
-  - "Awaiting contact info" rows show only email + signup date, with a muted "Waiting on host to submit details" badge and no Approve action.
-
-- `src/routes/_authenticated.admin.tsx`: bell badge query updated to the new actionable-pending count.
-
-## Out of scope
-
-- Email notifications (still deferred until a sender domain is set up).
-- Per-admin assignment of who receives which signup.
-
-## Files touched
-
-- `supabase/migrations/<new>.sql` (created)
-- `src/lib/kenangan.functions.ts`
-- `src/routes/_authenticated.dashboard.pending.tsx`
-- `src/routes/_authenticated.admin.index.tsx`
-- `src/routes/_authenticated.admin.tsx`
-- `src/integrations/supabase/types.ts` (regenerated after migration)
+## Edge cases
+- If `signUp` succeeds but `updateMyContactInfo` fails (network), user lands on `/dashboard/pending` and can submit from there — no data loss because the pending form re-collects the same fields.
+- If user refreshes mid-signup, state resets — acceptable since no account yet exists.
