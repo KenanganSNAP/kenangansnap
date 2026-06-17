@@ -2,8 +2,9 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { getAdminEventDetail, adminUpdateEvent } from "@/lib/admin-events.functions";
+import { listEventGuestsForAdmin, adminUpdateGuest, adminDeleteGuest } from "@/lib/kenangan.functions";
 import { toast } from "sonner";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Pencil, Check, X } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/admin/events/$id")({
   component: AdminEventDetail,
@@ -27,6 +28,7 @@ function AdminEventDetail() {
   const qc = useQueryClient();
   const { data, isLoading } = useQuery({ queryKey: ["admin-event", id], queryFn: () => getAdminEventDetail({ data: { id } }) });
   const [form, setForm] = useState<EditableValues | null>(null);
+  const [tab, setTab] = useState<"overview" | "guests">("overview");
 
   useEffect(() => {
     if (data && !form) {
@@ -57,6 +59,17 @@ function AdminEventDetail() {
     <div className="space-y-5">
       <Link to="/admin/events" className="inline-flex items-center gap-1 text-sm text-ink/70"><ArrowLeft size={14} /> Back to events</Link>
 
+      <div className="flex gap-1 rounded-full border border-ink/10 bg-card p-1 text-sm">
+        {(["overview", "guests"] as const).map((k) => (
+          <button key={k} onClick={() => setTab(k)}
+            className={`flex-1 rounded-full px-4 py-2 capitalize ${tab === k ? "bg-ink text-cream" : "text-ink/70"}`}>{k}</button>
+        ))}
+      </div>
+
+      {tab === "guests" ? (
+        <GuestsPanel eventId={id} />
+      ) : (
+      <>
       <div className="grid gap-3 sm:grid-cols-3">
         <Stat label="Guests" value={counts.guests} />
         <Stat label="Photos" value={counts.photos} />
