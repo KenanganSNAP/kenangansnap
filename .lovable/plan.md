@@ -1,56 +1,58 @@
-# Phase 2 Plan — Guest-Facing & Operations
+# Section 3 — Print Integration
 
-Building sections 2, 3, 4, 5, 7 on top of Phase 1. Each section is scoped so we can ship and verify it independently before moving on.
+Wire a real print pipeline on top of the local `window.print()` shortcut already on the capture preview. Admin configures one printer endpoint; guests get a pre-print options sheet (copies, include name, template on/off) before sending.
 
-## Section 2 — Photo Templates (booth overlays/frames)
+## What guests see (booth capture preview)
 
-- New table `photo_templates` (id, name, kind: 'frame'|'overlay'|'layout', preview_url, asset_url, config jsonb, is_active, sort_order). Admin CRUD at `/admin/templates` with image upload to `site-assets`.
-- New per-event link table `event_templates` (event_id, template_id, sort_order). Host picks which templates are available for their event from the event edit screen.
-- Booth UI (existing capture flow) gets a horizontal template picker. Selected template is composited onto the captured photo before upload (client-side canvas).
-- Stored photo keeps the composited result; original is kept too (new column `photos.original_url`).
+After capture, the existing actions stay (Retake / Send to album / local Print). Add a primary **"Send to printer"** button (only when a printer URL is configured). Tapping it opens a small bottom sheet:
 
-## Section 3 — Print Integration
+- Copies: 1 / 2 / 4 (segmented)
+- Include guest name on print: toggle (defaults on if guest entered a name)
+- Use selected template: toggle (defaults on; off sends original)
+- Confirm → calls `submitPrintJob`, shows success/error toast, closes sheet
 
-- Abstraction only — no real printer wiring yet.
-- New env/setting: `PRINT_SERVER_URL` (admin-editable in `site_settings.print_config`).
-- Server fn `submitPrintJob({ photoId })` POSTs to that URL with photo URL + event metadata. Wrapped in try/catch; failures surface as a toast in booth UI.
-- "Print" button appears in booth/review screen after capture. Disabled if no print URL configured.
-- No DB queue/log (per your earlier choice).
+The local browser-print button stays as a fallback (useful for testing / no printer configured).
 
-## Section 4 — Customisable Create Event Form (admin-editable)
+## What admin sees
 
-- New `site_settings.create_event_form` JSONB: ordered list of field definitions (key, label, type: text|textarea|date|image|toggle, required, help_text, visible).
-- Admin editor at `/admin/pages/create-event-form` using the existing simple structured-field pattern (reorder, toggle visible/required, edit labels & help text). Field `key`s are a fixed allowlist (title, event_date, venue, cover_image, welcome_message, etc.) — admin can't invent new DB columns, only reshape what's shown.
-- `/dashboard/create` reads the config and renders fields dynamically; the auto-slug + Customize UI built last turn stays as-is.
+New card on `/admin/pages` (or a dedicated `/admin/print` route — I'll put it on the existing admin Settings area to avoid route sprawl):
 
-## Section 5 — Dark Mode + i18n (EN/ID)
+- Printer endpoint URL (text)
+- Optional shared secret header value (text, stored as-is in `site_settings.print_config` — not a Lovable secret since it's per-deployment config the admin manages from the UI)
+- Default copies (1–4)
+- Toggle: allow guests to override copies
+- Save button
 
-- **Dark mode**: add `next-themes`, theme toggle in header, ensure tokens in `src/styles.css` already have dark variants (audit + fill gaps). Persist preference in localStorage.
-- **i18n**: add `react-i18next` with `en` + `id` locales. Translate nav, buttons, form labels, validation/error/toast messages, auth screens, booth/guest flow, admin panel UI (per your "all of them" answer). Static marketing copy (About/How It Works/Pricing) stays English in this pass — admin can localise later via CMS.
-- Language toggle in header, persisted in localStorage + `<html lang>`.
+Stored as a single JSON blob in `site_settings.print_config`.
 
-## Section 7 — Admin Guest Editing
+## Server
 
-- Extend `/admin/events/$id` with a Guests tab: list `guests` for that event, edit name/email/phone/RSVP, soft-delete, resend invitation.
-- New `adminUpdateGuest` / `adminDeleteGuest` server fns with `requireSupabaseAuth` + `has_role('admin')`. Audit rows written to `event_audits` (reuse) with `entity_type` discriminator — small migration adds `entity_type text default 'event'` and `entity_id uuid` columns to keep audit generic.
-- Hosts retain their existing per-event guest management; nothing changes for them.
+New `src/lib/print.functions.ts`:
 
-## Sequencing & confirmation gates
+- `getPrintConfig()` — public read of `site_settings.print_config` (safe fields only: enabled flag, max copies, allow override). Does NOT return the URL or secret.
+- `submitPrintJob({ photoId, copies, includeName, useTemplate })` — `requireSupabaseAuth` optional (guests are anon for booth); accept anon. Loads the photo row, picks `photo_url` vs `original_url` based on `useTemplate`, POSTs JSON to `print_config.url` with header `X-Print-Secret` if set. Payload:
+  ```json
+  { "photoUrl": "...", "eventId": "...", "eventTitle": "...", "guestName": "...", "copies": 2 }
+  ```
+  Wrapped in try/catch; returns `{ ok: true }` or `{ ok: false, error }`. No DB queue/log (per earlier decision).
+- `adminUpdatePrintConfig(...)` — `requireSupabaseAuth` + `has_role('admin')`, writes the full config blob.
 
-I'll build in this order and stop for your approval between each:
+## DB
 
-1. ✅ Section 5 (dark mode + i18n) — shipped.
-2. ✅ Section 4 (customisable Create Event form) — shipped.
-3. ✅ Section 2 (photo templates) — shipped (admin catalog at /admin/templates, host picker on event page, booth picker with client-side canvas compositing, print button on capture preview).
-4. Section 3 (print integration with configurable printer URL + copies/include-name options).
-5. Section 7 (admin guest editing + audit generalisation).
+Single migration:
 
-## Things I'd like you to confirm or add
+- `site_settings.print_config` JSONB (nullable). Default `null` = printing disabled.
+- No new tables. RLS on `site_settings` already in place.
 
-1. **Languages**: EN + Bahasa Melayu (BM). Add any others? No
-2. **Template compositing**: client-side canvas overlay is simplest and works on mobile. OK, or do you want server-side rendering (slower, needs a Worker-safe image lib)? I go with client-side canvas overlay
-3. **Print payload**: I'll send `{ photoUrl, eventId, eventTitle, guestName?, copies: 1 }` as JSON to `PRINT_SERVER_URL`. Add/remove fields? give options to add/remove before printing
-4. **Admin guest editing scope**: edit + soft-delete + resend invite. Want bulk import (CSV) too, or save that for later? save that for later
-5. **Create Event form**: admin can reorder/relabel/hide existing fields only (no new custom fields). Confirm — or do you want admin-defined custom fields stored in `events.custom_data` jsonb? yes
+## Files
 
-Reply with answers (or "go" to accept defaults) and I'll start with Section 5.
+- New: `src/lib/print.functions.ts`, `src/components/print-options-sheet.tsx`, `src/routes/_authenticated.admin.print.tsx` (admin form), migration.
+- Edit: `src/routes/event.$slug.capture.tsx` (replace bare Print button with sheet trigger; keep local print as fallback), `src/routes/_authenticated.admin.tsx` (nav link), `src/locales/en.ts` + `ms.ts` (already have most keys; add a few new ones), `.lovable/plan.md` (mark §3 done).
+
+## Out of scope (saved for later)
+
+- Print job history / retry queue
+- Multiple printers per event
+- Real driver integration (CUPS/IPP, vendor SDKs) — the configurable HTTP endpoint is the integration seam; whoever runs the booth points it at their own print bridge.
+
+Reply "go" to build, or tell me what to change.

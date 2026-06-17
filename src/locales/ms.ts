@@ -77,6 +77,7 @@ const ms: Translations = {
     copies: "Salinan",
     includeName: "Sertakan nama tetamu",
     sendToPrinter: "Hantar ke pencetak",
+    printLocal: "Cetak pada peranti ini",
     printed: "Dihantar ke pencetak",
     printFailed: "Tidak dapat hubungi pencetak",
   },
