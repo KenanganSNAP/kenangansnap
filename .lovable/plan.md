@@ -1,71 +1,67 @@
-# Fix Studio control → Events: Edit & View buttons
+# Improvements Plan
 
-## Root cause (Edit button)
+## 1. Event lifecycle status (admin-only)
 
-In TanStack file-based routing, when a route file has children, it acts as
-a **layout** for them. The layout's component MUST render `<Outlet />`,
-otherwise child routes match the URL but nothing appears on screen.
+Schema already has `events.status` (text). Formalize four values: `draft | active | completed | cancelled`.
 
-Current files:
-- `src/routes/_authenticated.admin.events.tsx` — renders the events table directly (no `<Outlet />`)
-- `src/routes/_authenticated.admin.events.$id.tsx` — child route
+- Migration: set default `'draft'`, add CHECK constraint on the four values, backfill existing rows (anything not in the set → `'active'`).
+- Server enforcement: only admins can change `status`. Hosts setting/updating events cannot write `status` (strip it from host updates; admin path keeps it via `adminUpdateEvent`).
+- Capture/guest/photo/notes/voice endpoints gate on `status = 'active'` instead of (or in addition to) `is_active`. Draft = hidden from guests, completed/cancelled = read-only, active = live.
+- Admin event detail UI already has the Status select — keep it, but add a colored badge in the admin events table and on the host dashboard (read-only for host).
 
-So clicking **Edit** navigates to `/admin/events/$id`, the parent matches,
-but because the parent component renders a table instead of `<Outlet />`,
-the edit page never mounts. The URL changes but the visible UI stays on
-the list (looks like nothing happened).
+## 2. Remove "Pause / Resume" from host
 
-## Root cause (View button)
+- `src/routes/_authenticated.dashboard.event.$id.tsx`: remove the Pause/Resume button and the "Live / Paused" pill.
+- `src/routes/_authenticated.dashboard.index.tsx`: replace the Live/Paused chip with the new status badge (read-only).
+- Keep `toggleEventActive` server fn around for now but stop calling it from the UI (or delete — preference?). I'll delete it to avoid dead code.
+- New hosts' events start as `draft` until admin flips to `active`.
 
-The **View** link goes to `/event/$slug` — the guest-facing landing page
-that asks "What's your name?" before opening the camera. For an admin
-clicking from Studio control, this is the wrong destination: it isn't
-"viewing" the event, it's joining as a guest. They likely expect a
-preview of the live guest page without the registration gate, or to be
-sent to the host dashboard view of the event.
+## 3. Per-event limits (admin-set)
 
-## Plan
+Add nullable integer columns on `events` with sensible defaults:
 
-### 1. Make the events list a true index route (fixes Edit)
 
-- Rename `src/routes/_authenticated.admin.events.tsx` → `src/routes/_authenticated.admin.events.index.tsx` (no other changes — same component, still renders the table at `/admin/events`).
-- Create a new `src/routes/_authenticated.admin.events.tsx` containing just a layout that returns `<Outlet />`:
-  ```tsx
-  import { createFileRoute, Outlet } from "@tanstack/react-router";
-  export const Route = createFileRoute("/_authenticated/admin/events")({
-    component: () => <Outlet />,
-  });
-  ```
-- The route tree regenerates on save; `/admin/events` continues to render the table, and `/admin/events/$id` now mounts the edit page inside the layout.
+| Column       | Default | Min | Meaning                              |
+| ------------ | ------- | --- | ------------------------------------ |
+| `max_guests` | 50      | 50  | Cap on `guests` rows per event       |
+| `max_photos` | 100     | 1   | Cap on `photos` rows                 |
+| `max_notes`  | 100     | 1   | Cap on `memories` where type='note'  |
+| `max_voice`  | 50      | 1   | Cap on `memories` where type='voice' |
+| `max_prints` | 20      | 0   | Cap consumed by the print flow       |
 
-### 2. Fix the View button destination
 
-Change the **View** link on the admin events list (and keep parity on
-the global admin pages if relevant) to open the event's guest landing
-page in a **new tab**, bypassing the "join as guest" expectation by
-making it clearly external/preview-style:
+- Admin Event Detail screen: new "Limits" card with five number inputs (validated min ≥ documented minimum). Saved through `adminUpdateEvent`.
+- Server enforcement in `joinEvent`, `uploadPhoto`, `submitNote`, `submitVoice`: count current rows for the event, reject with a friendly error when at cap.
+- Print flow (`src/lib/print.functions.ts`) honors `max_prints` when assembling a print job.
+- Host UI shows usage (e.g. "Photos 37 / 100") read-only.
 
-```tsx
-<a href={`/event/${e.slug}`} target="_blank" rel="noopener noreferrer"
-   className="text-ink underline">View</a>
-```
+## 4. Dark/light mode on every page
 
-This keeps the existing public route (no extra code needed) but makes it
-obvious it's a preview of the public guest experience, not in-app
-navigation. The admin's edit view stays in-app via the Edit button.
+The `ThemeProvider` and `HeaderControls` (toggle) already exist but the toggle is only mounted on auth + public pages. Make it global:
 
-(If you'd prefer View to instead deep-link to the host dashboard
-`/dashboard/event/$id`, say the word and I'll wire that instead — but
-admins aren't necessarily the host, so RLS on `getEventForHost` would
-reject them, making the public guest page the safer "View".)
+- Place a small `HeaderControls` in the top bar of `_authenticated.dashboard.tsx`, `_authenticated.admin.tsx`, and `event.$slug.tsx` so every authenticated/admin/guest page has it.
+- Audit the most-used pages for hardcoded `text-ink`, `bg-cream`, etc. without dark equivalents and add `dark:` variants where contrast breaks. Focus: dashboard cards, admin tables, capture/album/notes/voice screens.
+- QR visibility fix: the QR currently renders with `bgColor="transparent" fgColor="#2a1d14"` — invisible on dark backgrounds. Wrap the QR in a white-padded card (`bg-white p-3 rounded-xl`) regardless of theme so the QR has consistent contrast in both modes. Apply same fix to the printable poster (`src/lib/qr-poster.ts`).
 
-## Files touched
+## 5. Hide admin audit log from host
 
-- `src/routes/_authenticated.admin.events.tsx` — replaced with `<Outlet />` layout
-- `src/routes/_authenticated.admin.events.index.tsx` — new file, holds the existing list UI
-- View link updated to `target="_blank"` on the events list
+- `_authenticated.dashboard.event.$id.tsx`: remove the "Edited by Admin…" details panel and the `listEventAuditsForHost` query usage.
+- Keep the audit log visible in the admin event detail page only.
+- Optionally delete `listEventAuditsForHost` to remove the unused server fn.
 
-## Out of scope
+---
 
-- No DB / RLS changes (admin already has the needed policies).
-- No changes to the audit log, guests tab, or other admin pages.
+## Other things I'd recommend improving
+
+1. **Status semantics vs `is_active**` — `is_active` becomes redundant once `status` exists. I'll keep the column for backward compatibility but treat `status='active'` as the single source of truth, and stop writing `is_active` from the UI.
+2. `**status` CHECK constraint** is important — without it any string can land in the column.
+3. **QR poster PDF** — same contrast issue as on-screen QR; fix in one pass.
+4. **Cancelled events** — show a clear "This event has been cancelled" message on the guest-facing route instead of a generic "Event not available".
+5. **Guest cap UX** — when at cap, the guest-join page should show "Guest list full" rather than a toast error.
+
+## Open questions
+
+- For `max_prints`: is the cap **prints per event** or **prints per guest**? I've assumed per event.
+- Should existing live events be migrated to `status='active'` (yes by default) or left for admin review?
+
+If those are fine, say "go" and I'll implement.

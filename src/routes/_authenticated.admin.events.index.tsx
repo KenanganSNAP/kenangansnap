@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { listAllEvents, adminDeleteEvent } from "@/lib/kenangan.functions";
+import { StatusBadge } from "@/components/status-badge";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/admin/events/")({
@@ -35,9 +36,7 @@ function AdminEvents() {
               <td className="text-ink/70">{e.event_type}</td>
               <td className="text-ink/70">{e.date ? new Date(e.date).toLocaleDateString() : "—"}</td>
               <td>
-                <span className={e.is_active ? "rounded-full bg-emerald-500/15 px-2 py-0.5 text-emerald-700" : "rounded-full bg-ink/10 px-2 py-0.5"}>
-                  {e.is_active ? "Live" : "Paused"}
-                </span>
+                <StatusBadge status={e.status} />
               </td>
               <td className="px-4 py-3 text-right">
                 <div className="inline-flex gap-2">

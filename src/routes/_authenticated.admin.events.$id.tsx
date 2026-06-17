@@ -18,6 +18,11 @@ type EditableValues = {
   welcome_message: string | null;
   reveal_at: string | null;
   status: "draft" | "active" | "completed" | "cancelled";
+  max_guests: number;
+  max_photos: number;
+  max_notes: number;
+  max_voice: number;
+  max_prints: number;
 };
 
 function toDateInput(v: string | null) { return v ? v.slice(0, 10) : ""; }
@@ -36,7 +41,12 @@ function AdminEventDetail() {
       setForm({
         title: e.title, event_type: e.event_type as EditableValues["event_type"],
         date: e.date, venue: e.venue, welcome_message: e.welcome_message,
-        reveal_at: e.reveal_at, status: (e.status as EditableValues["status"]) ?? "active",
+        reveal_at: e.reveal_at, status: (e.status as EditableValues["status"]) ?? "draft",
+        max_guests: e.max_guests ?? 50,
+        max_photos: e.max_photos ?? 100,
+        max_notes: e.max_notes ?? 100,
+        max_voice: e.max_voice ?? 50,
+        max_prints: e.max_prints ?? 20,
       });
     }
   }, [data, form]);
@@ -98,6 +108,19 @@ function AdminEventDetail() {
           <button onClick={() => mut.mutate()} disabled={mut.isPending} className="rounded-full bg-ink px-6 py-2.5 text-sm text-cream disabled:opacity-60">{mut.isPending ? "Saving…" : "Save (logged as admin edit)"}</button>
         </div>
       </section>
+
+      <section className="space-y-3 rounded-2xl border border-ink/10 bg-card p-5">
+        <h2 className="font-serif text-xl italic">Capacity limits</h2>
+        <p className="text-xs text-ink/55">Admin-only. Guests will be blocked once a cap is hit.</p>
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <NumberInput label="Max guests (min 50)" min={50} value={form.max_guests} onChange={(n) => setForm({ ...form, max_guests: n })} />
+          <NumberInput label="Max photos" min={1} value={form.max_photos} onChange={(n) => setForm({ ...form, max_photos: n })} />
+          <NumberInput label="Max notes" min={1} value={form.max_notes} onChange={(n) => setForm({ ...form, max_notes: n })} />
+          <NumberInput label="Max voice messages" min={1} value={form.max_voice} onChange={(n) => setForm({ ...form, max_voice: n })} />
+          <NumberInput label="Max prints" min={0} value={form.max_prints} onChange={(n) => setForm({ ...form, max_prints: n })} />
+        </div>
+      </section>
+
 
       <section className="rounded-2xl border border-ink/10 bg-card p-5">
         <h2 className="font-serif text-xl italic">Audit trail</h2>
@@ -221,6 +244,15 @@ function Select({ label, value, options, onChange }: { label: string; value: str
       <select value={value} onChange={(e) => onChange(e.target.value)} className="mt-1 w-full rounded-xl border border-ink/15 bg-cream/70 px-4 py-2.5 text-sm capitalize">
         {options.map((o) => <option key={o} value={o}>{o}</option>)}
       </select>
+    </label>
+  );
+}
+
+function NumberInput({ label, value, onChange, min }: { label: string; value: number; onChange: (n: number) => void; min?: number }) {
+  return (
+    <label className="block">
+      <span className="text-xs uppercase tracking-wider text-ink/60">{label}</span>
+      <input type="number" min={min} value={value} onChange={(e) => onChange(Math.max(min ?? 0, Number(e.target.value) || 0))} className="mt-1 w-full rounded-xl border border-ink/15 bg-cream/70 px-4 py-2.5 text-sm" />
     </label>
   );
 }

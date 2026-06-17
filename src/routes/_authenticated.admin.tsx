@@ -1,4 +1,5 @@
 import { createFileRoute, Link, Outlet, useLocation } from "@tanstack/react-router";
+import { HeaderControls } from "@/components/header-controls";
 
 export const Route = createFileRoute("/_authenticated/admin")({
   component: AdminLayout,
@@ -25,8 +26,13 @@ function AdminLayout() {
 
   return (
     <div className="py-4">
-      <div className="text-[10px] uppercase tracking-[0.3em] text-ink/60">Admin</div>
-      <h1 className="mt-1 font-serif text-4xl italic">Studio control</h1>
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <div className="text-[10px] uppercase tracking-[0.3em] text-ink/60">Admin</div>
+          <h1 className="mt-1 font-serif text-4xl italic">Studio control</h1>
+        </div>
+        <HeaderControls />
+      </div>
       <div className="mt-5 flex flex-wrap gap-1 rounded-full border border-ink/10 bg-card p-1 text-sm">
         {tabs.map((t) => {
           const active = loc.pathname === t.to;

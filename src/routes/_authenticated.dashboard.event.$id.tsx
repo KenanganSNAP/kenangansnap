@@ -4,15 +4,15 @@ import { QRCodeSVG } from "qrcode.react";
 import { useRef, useState } from "react";
 import { toast } from "sonner";
 import {
-  getEventForHost, toggleEventActive, deletePhoto, deleteMemory, updateEventInvitation,
+  getEventForHost, deletePhoto, deleteMemory, updateEventInvitation,
 } from "@/lib/kenangan.functions";
-import { listEventAuditsForHost } from "@/lib/admin-events.functions";
 import { listActiveTemplates, getEventTemplates, setEventTemplates } from "@/lib/templates.functions";
 import { resizeImageToDataUrl } from "@/lib/image-resize";
 import { downloadFile, safeFilename } from "@/lib/download";
 import { exportZip } from "@/lib/zip-export";
 import { downloadQrPoster } from "@/lib/qr-poster";
-import { ArrowLeft, Copy, Download, Trash2, Upload, Power, Package, QrCode } from "lucide-react";
+import { StatusBadge } from "@/components/status-badge";
+import { ArrowLeft, Copy, Download, Trash2, Upload, Package, QrCode } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/dashboard/event/$id")({
   component: ManageEvent,
@@ -21,14 +21,12 @@ export const Route = createFileRoute("/_authenticated/dashboard/event/$id")({
 function ManageEvent() {
   const { id } = Route.useParams();
   const qc = useQueryClient();
-  const { data, isLoading, refetch } = useQuery({
+  const { data, isLoading } = useQuery({
     queryKey: ["event", id],
     queryFn: () => getEventForHost({ data: { id } }),
   });
-  const { data: audits = [] } = useQuery({ queryKey: ["event-audits", id], queryFn: () => listEventAuditsForHost({ data: { id } }) });
   const fileRef = useRef<HTMLInputElement>(null);
   const qrRef = useRef<HTMLDivElement>(null);
-  const [busy, setBusy] = useState(false);
   const [zipping, setZipping] = useState<"all" | "photos" | "voices" | null>(null);
 
   if (isLoading || !data) return <p className="py-10 text-ink/60">Loading…</p>;
@@ -41,13 +39,6 @@ function ManageEvent() {
   async function copy() {
     await navigator.clipboard.writeText(guestUrl);
     toast.success("Guest link copied");
-  }
-
-  async function toggle() {
-    setBusy(true);
-    await toggleEventActive({ data: { id: event.id, isActive: !event.is_active } });
-    await refetch();
-    setBusy(false);
   }
 
   async function uploadInvite(file: File) {
@@ -101,28 +92,11 @@ function ManageEvent() {
   return (
     <div className="py-4">
       <Link to="/dashboard" className="inline-flex items-center gap-1 text-sm text-ink/70"><ArrowLeft size={14} /> Back</Link>
-      {audits.length > 0 && (
-        <details className="mt-3 rounded-xl border border-gold/40 bg-gold/10 p-3 text-sm">
-          <summary className="cursor-pointer font-medium text-ink">Edited by Admin on {new Date(audits[0].created_at).toLocaleString()} — {Object.keys(audits[0].changed_fields as Record<string, unknown>).length} field(s). View all {audits.length} edit{audits.length > 1 ? "s" : ""}.</summary>
-          <ul className="mt-3 space-y-2">
-            {audits.map((a) => (
-              <li key={a.id} className="rounded-lg bg-cream/60 p-2 text-xs">
-                <div className="text-ink/60">{new Date(a.created_at).toLocaleString()}</div>
-                <ul className="mt-1 space-y-0.5">
-                  {Object.entries(a.changed_fields as Record<string, { from: unknown; to: unknown }>).map(([k, v]) => (
-                    <li key={k}><b>{k}:</b> <span className="line-through text-ink/55">{String(v.from ?? "—")}</span> → {String(v.to ?? "—")}</li>
-                  ))}
-                </ul>
-              </li>
-            ))}
-          </ul>
-        </details>
-      )}
 
       <header className="mt-4 grid gap-6 rounded-3xl border border-ink/10 bg-card p-6 lg:grid-cols-[auto,1fr]">
         <div className="flex flex-col items-center gap-3">
-          <div ref={qrRef} className="rounded-2xl bg-cream p-3 shadow-[0_10px_30px_-15px_rgba(40,25,15,0.3)]">
-            <QRCodeSVG value={guestUrl} size={180} bgColor="transparent" fgColor="#2a1d14" level="M" />
+          <div ref={qrRef} className="rounded-2xl bg-white p-3 shadow-[0_10px_30px_-15px_rgba(40,25,15,0.3)]">
+            <QRCodeSVG value={guestUrl} size={180} bgColor="#ffffff" fgColor="#2a1d14" level="M" />
           </div>
           <div className="flex flex-wrap justify-center gap-2">
             <button onClick={copy} className="inline-flex items-center gap-1 rounded-full border border-ink/15 px-3 py-1.5 text-xs">
@@ -136,9 +110,7 @@ function ManageEvent() {
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2 text-[10px] uppercase tracking-[0.3em] text-ink/55">
             <span>{event.event_type}</span>
-            <span className={event.is_active ? "rounded-full bg-emerald-500/10 px-2 py-0.5 text-emerald-700" : "rounded-full bg-ink/10 px-2 py-0.5"}>
-              {event.is_active ? "Live" : "Paused"}
-            </span>
+            <StatusBadge status={event.status} />
           </div>
           <h1 className="mt-2 font-serif text-4xl italic">{event.title}</h1>
           <p className="text-ink/65">
@@ -147,17 +119,13 @@ function ManageEvent() {
           <p className="mt-2 break-all text-sm text-ink/55">{guestUrl}</p>
 
           <div className="mt-4 grid grid-cols-4 gap-2 text-center">
-            <Tile label="Guests" value={guests.length} />
-            <Tile label="Photos" value={photos.length} />
-            <Tile label="Notes" value={notes.length} />
-            <Tile label="Voice" value={voices.length} />
+            <Tile label="Guests" value={`${guests.length}/${event.max_guests}`} />
+            <Tile label="Photos" value={`${photos.length}/${event.max_photos}`} />
+            <Tile label="Notes" value={`${notes.length}/${event.max_notes}`} />
+            <Tile label="Voice" value={`${voices.length}/${event.max_voice}`} />
           </div>
 
           <div className="mt-4 flex flex-wrap gap-2">
-            <button onClick={toggle} disabled={busy}
-              className="inline-flex items-center gap-1 rounded-full border border-ink/15 px-3 py-1.5 text-sm">
-              <Power size={14} /> {event.is_active ? "Pause" : "Resume"}
-            </button>
             <button onClick={() => fileRef.current?.click()}
               className="inline-flex items-center gap-1 rounded-full border border-ink/15 px-3 py-1.5 text-sm">
               <Upload size={14} /> {event.invitation_image_url ? "Replace invitation" : "Upload invitation"}
@@ -171,6 +139,7 @@ function ManageEvent() {
           </div>
         </div>
       </header>
+
 
       <Section title="Photos">
         {photos.length === 0 ? <Empty msg="No photos yet" /> : (
@@ -239,7 +208,7 @@ function ManageEvent() {
   );
 }
 
-function Tile({ label, value }: { label: string; value: number }) {
+function Tile({ label, value }: { label: string; value: number | string }) {
   return (
     <div className="rounded-xl bg-cream-deep/60 py-2">
       <div className="font-serif text-2xl italic">{value}</div>

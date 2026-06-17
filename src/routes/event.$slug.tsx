@@ -2,6 +2,7 @@ import { createFileRoute, Outlet, useLocation } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { getEventBySlug } from "@/lib/kenangan.functions";
 import { BottomNav } from "@/components/bottom-nav";
+import { HeaderControls } from "@/components/header-controls";
 
 export const Route = createFileRoute("/event/$slug")({
   component: EventLayout,
@@ -26,12 +27,15 @@ function EventLayout() {
       </div>
     );
   }
-  if (!event.is_active) {
+  if (event.status !== "active") {
+    const msg = event.status === "cancelled" ? "This event has been cancelled."
+      : event.status === "completed" ? "This event has ended. Thank you for being part of it."
+      : "This booth is not open yet. Please come back later.";
     return (
       <div className="grid min-h-screen place-items-center px-6 text-center">
         <div>
           <h1 className="font-serif text-3xl italic">{event.title}</h1>
-          <p className="mt-2 text-ink/65">This booth is paused. Please come back later.</p>
+          <p className="mt-2 text-ink/65 dark:text-foreground/70">{msg}</p>
         </div>
       </div>
     );
@@ -42,6 +46,7 @@ function EventLayout() {
 
   return (
     <div className="min-h-screen pb-24">
+      <div className="absolute right-3 top-3 z-10"><HeaderControls /></div>
       <Outlet />
       {showNav && <BottomNav slug={slug} />}
     </div>

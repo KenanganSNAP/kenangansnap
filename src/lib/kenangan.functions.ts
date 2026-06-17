@@ -12,6 +12,36 @@ function publicClient() {
   );
 }
 
+// Helper: load event by slug + assert it is in a state guests can interact with.
+async function loadEventForGuestAction(
+  sb: ReturnType<typeof publicClient>,
+  slug: string,
+  opts: { capTable?: "guests" | "photos" | "memories"; capCol?: "max_guests" | "max_photos" | "max_notes" | "max_voice"; memoryType?: "note" | "voice" } = {},
+) {
+  const { data: event, error } = await sb.from("events")
+    .select("id, status, max_guests, max_photos, max_notes, max_voice")
+    .eq("slug", slug).maybeSingle();
+  if (error) throw new Error(error.message);
+  if (!event) throw new Error("Event not found");
+  if (event.status !== "active") {
+    if (event.status === "cancelled") throw new Error("This event has been cancelled");
+    if (event.status === "completed") throw new Error("This event has ended");
+    throw new Error("Event not available");
+  }
+  if (opts.capTable && opts.capCol) {
+    const base = sb.from(opts.capTable).select("id", { count: "exact", head: true }).eq("event_id", event.id);
+    const { count } = opts.capTable === "memories" && opts.memoryType
+      ? await sb.from("memories").select("id", { count: "exact", head: true }).eq("event_id", event.id).eq("type", opts.memoryType)
+      : await base;
+    const cap = (event as unknown as Record<string, number>)[opts.capCol];
+    if ((count ?? 0) >= cap) {
+      const noun = opts.capCol === "max_guests" ? "Guest list" : opts.capCol === "max_photos" ? "Photo limit" : opts.capCol === "max_notes" ? "Note limit" : "Voice message limit";
+      throw new Error(`${noun} reached`);
+    }
+  }
+  return event;
+}
+
 // PUBLIC: Get event by slug (anon)
 export const getEventBySlug = createServerFn({ method: "GET" })
   .inputValidator((d: { slug: string }) => z.object({ slug: z.string().min(1) }).parse(d))
@@ -19,12 +49,11 @@ export const getEventBySlug = createServerFn({ method: "GET" })
     const sb = publicClient();
     const { data: event, error } = await sb
       .from("events")
-      .select("id, slug, title, event_type, date, venue, welcome_message, cover_image_url, invitation_image_url, reveal_at, is_active")
+      .select("id, slug, title, event_type, date, venue, welcome_message, cover_image_url, invitation_image_url, reveal_at, status, max_guests, max_photos, max_notes, max_voice, max_prints")
       .eq("slug", data.slug)
       .maybeSingle();
     if (error) throw new Error(error.message);
     if (!event) return null;
-    // Sign cover + invitation if present
     let coverUrl: string | null = null;
     let inviteUrl: string | null = null;
     if (event.cover_image_url) {
@@ -49,15 +78,14 @@ export const registerGuest = createServerFn({ method: "POST" })
   )
   .handler(async ({ data }) => {
     const sb = publicClient();
-    const { data: event, error: eErr } = await sb
-      .from("events").select("id, is_active").eq("slug", data.slug).maybeSingle();
-    if (eErr) throw new Error(eErr.message);
-    if (!event || !event.is_active) throw new Error("Event not available");
-
-    // Idempotent upsert via unique (event_id, session_token)
-    const { data: existing } = await sb.from("guests")
-      .select("id, name").eq("event_id", event.id).eq("session_token", data.sessionToken).maybeSingle();
-    if (existing) return { guestId: existing.id, name: existing.name };
+    // Idempotent: existing session bypasses the cap.
+    const { data: eventRow } = await sb.from("events").select("id").eq("slug", data.slug).maybeSingle();
+    if (eventRow) {
+      const { data: existing } = await sb.from("guests")
+        .select("id, name").eq("event_id", eventRow.id).eq("session_token", data.sessionToken).maybeSingle();
+      if (existing) return { guestId: existing.id, name: existing.name };
+    }
+    const event = await loadEventForGuestAction(sb, data.slug, { capTable: "guests", capCol: "max_guests" });
 
     const { data: inserted, error } = await sb.from("guests")
       .insert({ event_id: event.id, name: data.name, session_token: data.sessionToken })
@@ -81,10 +109,7 @@ export const uploadPhoto = createServerFn({ method: "POST" })
   )
   .handler(async ({ data }) => {
     const sb = publicClient();
-    const { data: event, error: eErr } = await sb.from("events")
-      .select("id, is_active").eq("slug", data.slug).maybeSingle();
-    if (eErr) throw new Error(eErr.message);
-    if (!event || !event.is_active) throw new Error("Event not available");
+    const event = await loadEventForGuestAction(sb, data.slug, { capTable: "photos", capCol: "max_photos" });
 
     async function uploadDataUrl(dataUrl: string) {
       const [meta, b64] = dataUrl.split(",");
@@ -127,10 +152,7 @@ export const uploadVoice = createServerFn({ method: "POST" })
   )
   .handler(async ({ data }) => {
     const sb = publicClient();
-    const { data: event, error: eErr } = await sb.from("events")
-      .select("id, is_active").eq("slug", data.slug).maybeSingle();
-    if (eErr) throw new Error(eErr.message);
-    if (!event || !event.is_active) throw new Error("Event not available");
+    const event = await loadEventForGuestAction(sb, data.slug, { capTable: "memories", capCol: "max_voice", memoryType: "voice" });
 
     const [meta, b64] = data.dataUrl.split(",");
     const mime = meta.match(/data:(.*?);base64/)?.[1] ?? "audio/webm";
@@ -166,8 +188,7 @@ export const submitNote = createServerFn({ method: "POST" })
   )
   .handler(async ({ data }) => {
     const sb = publicClient();
-    const { data: event } = await sb.from("events").select("id, is_active").eq("slug", data.slug).maybeSingle();
-    if (!event || !event.is_active) throw new Error("Event not available");
+    const event = await loadEventForGuestAction(sb, data.slug, { capTable: "memories", capCol: "max_notes", memoryType: "note" });
     const { error, data: row } = await sb.from("memories").insert({
       event_id: event.id,
       guest_id: data.guestId,
@@ -185,8 +206,8 @@ export const listAlbum = createServerFn({ method: "GET" })
   .handler(async ({ data }) => {
     const sb = publicClient();
     const { data: event } = await sb.from("events")
-      .select("id, is_active, reveal_at").eq("slug", data.slug).maybeSingle();
-    if (!event || !event.is_active) return { revealed: false, revealAt: null, items: [] as PhotoItem[] };
+      .select("id, status, reveal_at").eq("slug", data.slug).maybeSingle();
+    if (!event || (event.status !== "active" && event.status !== "completed")) return { revealed: false, revealAt: null, items: [] as PhotoItem[] };
     const revealed = !event.reveal_at || new Date(event.reveal_at) <= new Date();
     if (!revealed) return { revealed: false, revealAt: event.reveal_at, items: [] };
 
@@ -217,8 +238,8 @@ export const listMemories = createServerFn({ method: "GET" })
   .handler(async ({ data }) => {
     const sb = publicClient();
     const { data: event } = await sb.from("events")
-      .select("id, is_active, reveal_at").eq("slug", data.slug).maybeSingle();
-    if (!event || !event.is_active) return { revealed: false, notes: [], voices: [] };
+      .select("id, status, reveal_at").eq("slug", data.slug).maybeSingle();
+    if (!event || (event.status !== "active" && event.status !== "completed")) return { revealed: false, notes: [], voices: [] };
     const revealed = !event.reveal_at || new Date(event.reveal_at) <= new Date();
     if (!revealed) return { revealed: false, notes: [], voices: [] };
 
@@ -245,7 +266,7 @@ export const listMyEvents = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     const { data, error } = await context.supabase
-      .from("events").select("id, slug, title, event_type, date, venue, is_active, created_at")
+      .from("events").select("id, slug, title, event_type, date, venue, status, max_guests, max_photos, max_notes, max_voice, max_prints, created_at")
       .eq("host_id", context.userId).order("created_at", { ascending: false });
     if (error) throw new Error(error.message);
 
@@ -312,7 +333,6 @@ export const createEvent = createServerFn({ method: "POST" })
       venue: data.venue,
       welcome_message: data.welcomeMessage,
       reveal_at: data.revealAt,
-      is_active: true,
       custom_data: (data.customData ?? {}) as never,
     }).select("id, slug").single();
     if (error) throw new Error(error.message);
@@ -392,15 +412,8 @@ export const getEventForHost = createServerFn({ method: "GET" })
     };
   });
 
-export const toggleEventActive = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
-  .inputValidator((d: { id: string; isActive: boolean }) =>
-    z.object({ id: z.string().uuid(), isActive: z.boolean() }).parse(d))
-  .handler(async ({ data, context }) => {
-    const { error } = await context.supabase.from("events").update({ is_active: data.isActive }).eq("id", data.id);
-    if (error) throw new Error(error.message);
-    return { ok: true };
-  });
+// (toggleEventActive removed — status is admin-only via adminUpdateEvent)
+
 
 export const updateEventInvitation = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -478,7 +491,7 @@ export const listAllEvents = createServerFn({ method: "GET" })
   .handler(async ({ context }) => {
     await requireAdmin(context);
     const { data: events, error } = await context.supabase.from("events")
-      .select("id, slug, title, event_type, date, venue, is_active, host_id, created_at")
+      .select("id, slug, title, event_type, date, venue, status, host_id, created_at")
       .order("created_at", { ascending: false });
     if (error) throw new Error(error.message);
     const { data: hosts } = await context.supabase.from("hosts").select("user_id, email");
