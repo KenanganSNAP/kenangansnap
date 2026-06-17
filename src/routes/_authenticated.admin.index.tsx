@@ -14,6 +14,8 @@ export const Route = createFileRoute("/_authenticated/admin/")({
 
 type HostRow = Awaited<ReturnType<typeof listHosts>>[number];
 
+type Filter = "ready" | "awaiting" | "approved" | "suspended" | "all";
+
 function AdminHosts() {
   const qc = useQueryClient();
   const { data, isLoading } = useQuery({ queryKey: ["admin-hosts"], queryFn: () => listHosts() });
@@ -21,6 +23,7 @@ function AdminHosts() {
   const [adminEmail, setAdminEmail] = useState("");
   const [granting, setGranting] = useState(false);
   const [editing, setEditing] = useState<HostRow | null>(null);
+  const [filter, setFilter] = useState<Filter>("ready");
 
   async function change(userId: string, status: "approved" | "suspended" | "pending") {
     await setHostStatus({ data: { userId, status } });
@@ -56,16 +59,40 @@ function AdminHosts() {
 
   if (isLoading) return <p className="text-ink/60">Loading…</p>;
 
-  const pendingCount = (data ?? []).filter((h) => h.status === "pending").length;
+  const all = data ?? [];
+  const counts = {
+    ready: all.filter((h) => h.status === "pending" && h.contact_submitted).length,
+    awaiting: all.filter((h) => h.status === "pending" && !h.contact_submitted).length,
+    approved: all.filter((h) => h.status === "approved").length,
+    suspended: all.filter((h) => h.status === "suspended").length,
+    all: all.length,
+  };
+  const filtered = all.filter((h) => {
+    if (filter === "ready") return h.status === "pending" && h.contact_submitted;
+    if (filter === "awaiting") return h.status === "pending" && !h.contact_submitted;
+    if (filter === "approved") return h.status === "approved";
+    if (filter === "suspended") return h.status === "suspended";
+    return true;
+  });
+
+  const tabs: { id: Filter; label: string }[] = [
+    { id: "ready", label: "Ready for review" },
+    { id: "awaiting", label: "Awaiting contact info" },
+    { id: "approved", label: "Approved" },
+    { id: "suspended", label: "Suspended" },
+    { id: "all", label: "All" },
+  ];
 
   return (
     <div className="space-y-6">
       <section className="rounded-2xl border border-amber-500/20 bg-amber-500/5 p-5">
         <h2 className="font-serif text-xl italic">New signups</h2>
         <p className="mt-1 text-sm text-ink/70">
-          {pendingCount > 0
-            ? `${pendingCount} host${pendingCount === 1 ? "" : "s"} awaiting your approval — see highlighted rows below. The bell badge in the header also shows the live count.`
-            : "No pending hosts right now. New signups land here for approval, and the bell badge in the header lights up when they arrive."}
+          {counts.ready > 0
+            ? `${counts.ready} host${counts.ready === 1 ? "" : "s"} ready for your review. ${counts.awaiting > 0 ? `${counts.awaiting} more haven't shared their contact info yet.` : ""}`
+            : counts.awaiting > 0
+              ? `No hosts ready for review yet. ${counts.awaiting} new signup${counts.awaiting === 1 ? " hasn't" : "s haven't"} shared their contact info yet — they'll appear here once they do.`
+              : "No pending hosts right now. New signups appear in the \"Ready for review\" tab once they share their contact info."}
         </p>
       </section>
 
@@ -99,13 +126,18 @@ function AdminHosts() {
       </section>
 
       <div className="overflow-hidden rounded-2xl border border-ink/10 bg-card">
-        <div className="flex items-center justify-between border-b border-ink/5 px-4 py-3">
-          <h2 className="font-serif text-lg italic">Hosts</h2>
-          {pendingCount > 0 && (
-            <span className="rounded-full bg-amber-500/15 px-3 py-1 text-xs text-amber-800">
-              {pendingCount} awaiting approval
-            </span>
-          )}
+        <div className="flex flex-wrap items-center gap-2 border-b border-ink/5 px-4 py-3">
+          <h2 className="mr-2 font-serif text-lg italic">Hosts</h2>
+          <div className="flex flex-wrap gap-1 rounded-full border border-ink/10 bg-cream/60 p-1 text-xs">
+            {tabs.map((t) => (
+              <button
+                key={t.id} onClick={() => setFilter(t.id)}
+                className={`rounded-full px-3 py-1.5 ${filter === t.id ? "bg-ink text-cream" : "text-ink/70 hover:bg-ink/5"}`}
+              >
+                {t.label} <span className="opacity-60">({counts[t.id]})</span>
+              </button>
+            ))}
+          </div>
         </div>
         <table className="w-full text-sm">
           <thead className="bg-cream-deep/60 text-left text-[10px] uppercase tracking-wider text-ink/60">
@@ -119,30 +151,37 @@ function AdminHosts() {
             </tr>
           </thead>
           <tbody>
-            {(data ?? []).map((h) => (
-              <tr key={h.user_id} className={`border-t border-ink/5 ${h.status === "pending" ? "bg-amber-500/5" : ""}`}>
-                <td className="px-4 py-3">{h.email}</td>
-                <td className="text-ink/75">{h.full_name || <span className="text-ink/40">—</span>}</td>
-                <td className="text-ink/75">{h.phone || <span className="text-ink/40">—</span>}</td>
-                <td>
-                  <span className={`rounded-full px-2 py-0.5 text-xs ${
-                    h.status === "approved" ? "bg-emerald-500/15 text-emerald-700"
-                      : h.status === "suspended" ? "bg-red-500/15 text-red-700"
-                      : "bg-amber-500/15 text-amber-800"}`}>{h.status}</span>
-                </td>
-                <td className="text-ink/60">{new Date(h.created_at).toLocaleDateString()}</td>
-                <td className="px-4 py-3 text-right">
-                  <div className="inline-flex flex-wrap justify-end gap-1">
-                    <button onClick={() => setEditing(h)} className="rounded-full bg-ink/5 px-3 py-1 text-ink/75">Contact</button>
-                    {h.status !== "approved" && <button onClick={() => change(h.user_id, "approved")} className="rounded-full bg-emerald-600/10 px-3 py-1 text-emerald-700">Approve</button>}
-                    {h.status !== "suspended" && <button onClick={() => change(h.user_id, "suspended")} className="rounded-full bg-amber-600/10 px-3 py-1 text-amber-800">Suspend</button>}
-                    <button onClick={() => remove(h.user_id)} className="rounded-full bg-red-600/10 px-3 py-1 text-red-700">Delete</button>
-                  </div>
-                </td>
-              </tr>
-            ))}
-            {(data ?? []).length === 0 && (
-              <tr><td colSpan={6} className="px-4 py-10 text-center text-ink/55">No hosts yet</td></tr>
+            {filtered.map((h) => {
+              const awaiting = h.status === "pending" && !h.contact_submitted;
+              return (
+                <tr key={h.user_id} className={`border-t border-ink/5 ${h.status === "pending" && h.contact_submitted ? "bg-amber-500/5" : awaiting ? "opacity-70" : ""}`}>
+                  <td className="px-4 py-3">{h.email}</td>
+                  <td className="text-ink/75">{h.full_name || <span className="text-ink/40">—</span>}</td>
+                  <td className="text-ink/75">{h.phone || <span className="text-ink/40">—</span>}</td>
+                  <td>
+                    {awaiting ? (
+                      <span className="rounded-full bg-ink/10 px-2 py-0.5 text-xs text-ink/60">awaiting contact info</span>
+                    ) : (
+                      <span className={`rounded-full px-2 py-0.5 text-xs ${
+                        h.status === "approved" ? "bg-emerald-500/15 text-emerald-700"
+                          : h.status === "suspended" ? "bg-red-500/15 text-red-700"
+                          : "bg-amber-500/15 text-amber-800"}`}>{h.status}</span>
+                    )}
+                  </td>
+                  <td className="text-ink/60">{new Date(h.created_at).toLocaleDateString()}</td>
+                  <td className="px-4 py-3 text-right">
+                    <div className="inline-flex flex-wrap justify-end gap-1">
+                      {!awaiting && <button onClick={() => setEditing(h)} className="rounded-full bg-ink/5 px-3 py-1 text-ink/75">Contact</button>}
+                      {!awaiting && h.status !== "approved" && <button onClick={() => change(h.user_id, "approved")} className="rounded-full bg-emerald-600/10 px-3 py-1 text-emerald-700">Approve</button>}
+                      {h.status !== "suspended" && <button onClick={() => change(h.user_id, "suspended")} className="rounded-full bg-amber-600/10 px-3 py-1 text-amber-800">Suspend</button>}
+                      <button onClick={() => remove(h.user_id)} className="rounded-full bg-red-600/10 px-3 py-1 text-red-700">Delete</button>
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
+            {filtered.length === 0 && (
+              <tr><td colSpan={6} className="px-4 py-10 text-center text-ink/55">No hosts in this view</td></tr>
             )}
           </tbody>
         </table>

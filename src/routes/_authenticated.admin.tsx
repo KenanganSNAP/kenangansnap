@@ -28,7 +28,7 @@ function AdminLayout() {
   const onPages = loc.pathname.startsWith("/admin/pages");
 
   const { data: hosts } = useQuery({ queryKey: ["admin-hosts"], queryFn: () => listHosts(), staleTime: 30_000 });
-  const pendingCount = (hosts ?? []).filter((h) => h.status === "pending").length;
+  const pendingCount = (hosts ?? []).filter((h) => h.status === "pending" && h.contact_submitted).length;
 
   return (
     <div className="py-4">

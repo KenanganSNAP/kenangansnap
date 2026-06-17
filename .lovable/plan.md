@@ -1,40 +1,56 @@
 ## Goal
-New signups land on a "waiting for approval" page where they can submit contact info. Admins are notified by email and can approve, reject, or edit the contact info from the admin panel. Admins can also opt in/out of receiving notification emails.
 
-## Database changes (one migration)
-- Extend `public.hosts` with: `full_name`, `phone`, `company`, `event_interest` (text), `contact_updated_at`.
-- Change the `handle_new_user` trigger so new hosts default to `status = 'pending'` (not `'approved'`). The seeded admin email stays auto-approved.
-- Add `public.admin_notification_prefs` table: `user_id` (PK → auth.users), `notify_new_signups` boolean default `true`. Admins read/write only their own row; service role full access. (This is the "admin can opt in/out" toggle.)
-- RLS already lets hosts read/update their own row — extend the update policy so a pending host can edit their own contact fields, but not `status` or `email`.
+New hosts must submit their contact information first. Only after submission does the host become visible/approvable in the admin panel with their details shown.
 
-## Server functions (`src/lib/kenangan.functions.ts` + new file)
-- `getMyHost()` — returns full host row (status + contact fields) for the pending page.
-- `updateMyContactInfo({ full_name, phone, company, event_interest })` — host updates own contact info (auth + Zod validation, max lengths).
-- `adminUpdateHostContact({ userId, ...fields })` — admin edits any host's contact info.
-- Extend `listHosts()` to return the contact fields for the admin table.
-- New `getMyAdminPrefs()` / `updateMyAdminPrefs({ notify_new_signups })`.
-- New `sendNewSignupNotification({ hostUserId })` — internal helper called from a trigger route (see below).
+## Flow
 
-## Pending-approval page
-- New route `src/routes/_authenticated/dashboard/pending.tsx` (or gate inside existing dashboard layout): if `host.status !== 'approved'`, redirect/render the pending screen instead of the dashboard.
-- Screen shows: status badge, explanatory copy, and a contact-info form (name / phone / company / event interest) with save button. Re-submitting updates the row; admin sees latest.
-- Approved hosts continue to the normal dashboard. Suspended hosts see a suspended message.
+1. New user signs up → `hosts.status = 'pending'` (already the case), plus a new sub-state `contact_submitted = false`.
+2. Pending page (`/dashboard/pending`) shows the contact form with required fields. The "Approval requested" / waiting-for-admin copy is **hidden** until the form is submitted.
+3. On submit → set `contact_submitted = true`, stamp `contact_updated_at`, switch the pending page to the "waiting for admin approval" view (read-only summary of what they submitted, with an "Edit" toggle).
+4. Admin panel hosts list:
+   - **Hides** pending hosts who have not yet submitted contact info (or shows them in a collapsed "Awaiting contact info" section, greyed out, no Approve button).
+   - **Shows** pending hosts who have submitted, with full contact details and the Approve / Suspend / Edit Contact actions already in place.
+   - Bell badge count in the admin header changes to count only `pending + contact_submitted = true` (actionable pending), so admins aren't pinged for users who haven't filled the form yet.
 
-## Admin panel updates (`_authenticated.admin.index.tsx`)
-- Hosts table gains contact columns + an "Edit contact" dialog (admin-editable name/phone/company/event interest).
-- Highlight rows with `status='pending'`; quick Approve / Suspend buttons (already exist via `setHostStatus`).
-- New "Notification preferences" card at top: toggle "Email me when a new host signs up". Persists to `admin_notification_prefs`.
+## Database (one migration)
 
-## Email notification to admins
-- Prereqs: domain is already configured per the user. Run `email_domain--setup_email_infra` if not yet set up, then `email_domain--scaffold_transactional_email`.
-- New React Email template `src/lib/email-templates/admin-new-signup.tsx`: shows host email, signup time, contact info (if any), and a link back to `/admin`.
-- New public action route `src/routes/api/public/notify-new-signup.ts` — called by a Postgres trigger via `pg_net` after a `hosts` insert. Verifies an HMAC header (`NEW_SIGNUP_WEBHOOK_SECRET`, added via `add_secret`), looks up all users with `admin` role whose `admin_notification_prefs.notify_new_signups` is true (default true), and enqueues one email per admin through `/lovable/email/transactional/send` using service-role auth.
-- DB trigger on `public.hosts` after insert calls `pg_net.http_post` to that route with the new host_id and HMAC signature.
+- Add `contact_submitted boolean NOT NULL DEFAULT false` to `public.hosts`.
+- Update the host RLS update policy so a host can flip `contact_submitted` to true only when required fields (`full_name`, `phone`, `event_interest`) are non-empty; cannot flip it back to false (admin can, via service role / admin policy).
+- Backfill existing approved hosts to `contact_submitted = true` so they aren't hidden retroactively.
 
-## UX details
-- Contact form uses Zod (trim, max 100/30/100/1000 chars). Toast on save.
-- Pending page mounted with `HeaderControls` for theme/lang.
-- Admin "Edit contact" dialog reuses the same Zod schema.
+## Server functions (`src/lib/kenangan.functions.ts`)
+
+- `updateMyContactInfo`: extend to accept a `submit: boolean` flag. When `submit` is true, validate required fields with Zod (full_name 1–100, phone 5–30, company 0–100, event_interest 1–1000) and set `contact_submitted = true`.
+- `getMyHost`: already returns the host row; add `contact_submitted` to the projection.
+- `listHosts` (admin): add a `filter` param (`all` | `awaiting_contact` | `ready_for_review` | `approved` | `suspended`) and include `contact_submitted` in results. Default UI tab = "Ready for review".
+- `adminUpdateHostContact`: unchanged behavior, just continues to work.
+- Bell count query (`pendingCount`): change to `status = 'pending' AND contact_submitted = true`.
+
+## UI changes
+
+- `src/routes/_authenticated.dashboard.pending.tsx`:
+  - Two states driven by `host.contact_submitted`:
+    - **Not submitted**: headline "Tell us about your event", contact form, "Submit for approval" button (disabled until required fields valid).
+    - **Submitted & still pending**: headline "Thanks — your request is with our team", read-only summary card, "Edit details" button that flips back to the form (keeps `contact_submitted = true`; admin already saw it, edits just update fields).
+  - Remove the current "waiting for approval" copy from the not-submitted state.
+
+- `src/routes/_authenticated.admin.index.tsx`:
+  - Add a tab/segment switcher above the hosts table: **Ready for review** (default) · **Awaiting contact info** · **Approved** · **Suspended** · **All**.
+  - "Ready for review" rows show full contact columns + Approve / Suspend / Edit Contact.
+  - "Awaiting contact info" rows show only email + signup date, with a muted "Waiting on host to submit details" badge and no Approve action.
+
+- `src/routes/_authenticated.admin.tsx`: bell badge query updated to the new actionable-pending count.
 
 ## Out of scope
-- Per-admin assignment of "which specific account receives notifications for which signup" — the toggle covers opt-in/out per admin, which matches "admin can also assign or not assign any specific account to receive". If you want one specific admin to own a given signup (assignment workflow), say so and I'll add an `assigned_admin_id` to `hosts` in a follow-up.
+
+- Email notifications (still deferred until a sender domain is set up).
+- Per-admin assignment of who receives which signup.
+
+## Files touched
+
+- `supabase/migrations/<new>.sql` (created)
+- `src/lib/kenangan.functions.ts`
+- `src/routes/_authenticated.dashboard.pending.tsx`
+- `src/routes/_authenticated.admin.index.tsx`
+- `src/routes/_authenticated.admin.tsx`
+- `src/integrations/supabase/types.ts` (regenerated after migration)
