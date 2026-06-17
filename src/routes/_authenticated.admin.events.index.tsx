@@ -42,7 +42,7 @@ function AdminEvents() {
               <td className="px-4 py-3 text-right">
                 <div className="inline-flex gap-2">
                   <Link to="/admin/events/$id" params={{ id: e.id }} className="rounded-full border border-ink/15 px-3 py-1">Edit</Link>
-                  <Link to="/event/$slug" params={{ slug: e.slug }} className="text-ink underline">View</Link>
+                  <a href={`/event/${e.slug}`} target="_blank" rel="noopener noreferrer" className="text-ink underline">View</a>
                   <button onClick={() => remove(e.id, e.title)} className="rounded-full bg-red-600/10 px-3 py-1 text-red-700">Delete</button>
                 </div>
               </td>
