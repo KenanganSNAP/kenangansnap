@@ -327,20 +327,19 @@ export const updateMyContactInfo = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: { full_name?: string | null; phone?: string | null; company?: string | null; event_interest?: string | null; submit?: boolean }) => contactSchema.parse(d))
   .handler(async ({ data, context }) => {
-    const update: Record<string, unknown> = {
+    if (data.submit) {
+      if (!data.full_name?.trim() || !data.phone?.trim() || !data.event_interest?.trim()) {
+        throw new Error("Full name, phone, and event interest are required");
+      }
+    }
+    const { error } = await context.supabase.from("hosts").update({
       full_name: data.full_name ?? null,
       phone: data.phone ?? null,
       company: data.company ?? null,
       event_interest: data.event_interest ?? null,
       contact_updated_at: new Date().toISOString(),
-    };
-    if (data.submit) {
-      if (!data.full_name?.trim() || !data.phone?.trim() || !data.event_interest?.trim()) {
-        throw new Error("Full name, phone, and event interest are required");
-      }
-      update.contact_submitted = true;
-    }
-    const { error } = await context.supabase.from("hosts").update(update).eq("user_id", context.userId);
+      ...(data.submit ? { contact_submitted: true } : {}),
+    } as never).eq("user_id", context.userId);
     if (error) throw new Error(error.message);
     return { ok: true };
   });
