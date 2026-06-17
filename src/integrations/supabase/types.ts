@@ -105,6 +105,11 @@ export type Database = {
           id: string
           invitation_image_url: string | null
           is_active: boolean
+          max_guests: number
+          max_notes: number
+          max_photos: number
+          max_prints: number
+          max_voice: number
           reveal_at: string | null
           slug: string
           status: string
@@ -122,6 +127,11 @@ export type Database = {
           id?: string
           invitation_image_url?: string | null
           is_active?: boolean
+          max_guests?: number
+          max_notes?: number
+          max_photos?: number
+          max_prints?: number
+          max_voice?: number
           reveal_at?: string | null
           slug: string
           status?: string
@@ -139,6 +149,11 @@ export type Database = {
           id?: string
           invitation_image_url?: string | null
           is_active?: boolean
+          max_guests?: number
+          max_notes?: number
+          max_photos?: number
+          max_prints?: number
+          max_voice?: number
           reveal_at?: string | null
           slug?: string
           status?: string
