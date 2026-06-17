@@ -12,6 +12,35 @@ function publicClient() {
   );
 }
 
+// Helper: load event by slug + assert it is in a state guests can interact with.
+async function loadEventForGuestAction(
+  sb: ReturnType<typeof publicClient>,
+  slug: string,
+  opts: { capTable?: "guests" | "photos" | "memories"; capCol?: "max_guests" | "max_photos" | "max_notes" | "max_voice"; memoryType?: "note" | "voice" } = {},
+) {
+  const { data: event, error } = await sb.from("events")
+    .select("id, status, max_guests, max_photos, max_notes, max_voice")
+    .eq("slug", slug).maybeSingle();
+  if (error) throw new Error(error.message);
+  if (!event) throw new Error("Event not found");
+  if (event.status !== "active") {
+    if (event.status === "cancelled") throw new Error("This event has been cancelled");
+    if (event.status === "completed") throw new Error("This event has ended");
+    throw new Error("Event not available");
+  }
+  if (opts.capTable && opts.capCol) {
+    let q = sb.from(opts.capTable).select("id", { count: "exact", head: true }).eq("event_id", event.id);
+    if (opts.capTable === "memories" && opts.memoryType) q = q.eq("type", opts.memoryType);
+    const { count } = await q;
+    const cap = (event as Record<string, number>)[opts.capCol];
+    if ((count ?? 0) >= cap) {
+      const noun = opts.capCol === "max_guests" ? "Guest list" : opts.capCol === "max_photos" ? "Photo limit" : opts.capCol === "max_notes" ? "Note limit" : "Voice message limit";
+      throw new Error(`${noun} reached`);
+    }
+  }
+  return event;
+}
+
 // PUBLIC: Get event by slug (anon)
 export const getEventBySlug = createServerFn({ method: "GET" })
   .inputValidator((d: { slug: string }) => z.object({ slug: z.string().min(1) }).parse(d))
@@ -19,12 +48,11 @@ export const getEventBySlug = createServerFn({ method: "GET" })
     const sb = publicClient();
     const { data: event, error } = await sb
       .from("events")
-      .select("id, slug, title, event_type, date, venue, welcome_message, cover_image_url, invitation_image_url, reveal_at, is_active")
+      .select("id, slug, title, event_type, date, venue, welcome_message, cover_image_url, invitation_image_url, reveal_at, status, max_guests, max_photos, max_notes, max_voice, max_prints")
       .eq("slug", data.slug)
       .maybeSingle();
     if (error) throw new Error(error.message);
     if (!event) return null;
-    // Sign cover + invitation if present
     let coverUrl: string | null = null;
     let inviteUrl: string | null = null;
     if (event.cover_image_url) {
@@ -49,15 +77,14 @@ export const registerGuest = createServerFn({ method: "POST" })
   )
   .handler(async ({ data }) => {
     const sb = publicClient();
-    const { data: event, error: eErr } = await sb
-      .from("events").select("id, is_active").eq("slug", data.slug).maybeSingle();
-    if (eErr) throw new Error(eErr.message);
-    if (!event || !event.is_active) throw new Error("Event not available");
-
-    // Idempotent upsert via unique (event_id, session_token)
-    const { data: existing } = await sb.from("guests")
-      .select("id, name").eq("event_id", event.id).eq("session_token", data.sessionToken).maybeSingle();
-    if (existing) return { guestId: existing.id, name: existing.name };
+    // Idempotent: existing session bypasses the cap.
+    const { data: eventRow } = await sb.from("events").select("id").eq("slug", data.slug).maybeSingle();
+    if (eventRow) {
+      const { data: existing } = await sb.from("guests")
+        .select("id, name").eq("event_id", eventRow.id).eq("session_token", data.sessionToken).maybeSingle();
+      if (existing) return { guestId: existing.id, name: existing.name };
+    }
+    const event = await loadEventForGuestAction(sb, data.slug, { capTable: "guests", capCol: "max_guests" });
 
     const { data: inserted, error } = await sb.from("guests")
       .insert({ event_id: event.id, name: data.name, session_token: data.sessionToken })
