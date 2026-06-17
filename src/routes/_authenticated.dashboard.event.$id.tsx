@@ -208,7 +208,7 @@ function ManageEvent() {
   );
 }
 
-function Tile({ label, value }: { label: string; value: number }) {
+function Tile({ label, value }: { label: string; value: number | string }) {
   return (
     <div className="rounded-xl bg-cream-deep/60 py-2">
       <div className="font-serif text-2xl italic">{value}</div>
