@@ -50,9 +50,7 @@ function Dashboard() {
             >
               <div className="flex items-center justify-between text-[10px] uppercase tracking-[0.3em] text-ink/55">
                 <span>{e.event_type}</span>
-                <span className={e.is_active ? "rounded-full bg-emerald-500/10 px-2 py-0.5 text-emerald-700" : "rounded-full bg-ink/10 px-2 py-0.5"}>
-                  {e.is_active ? "Live" : "Paused"}
-                </span>
+                <StatusBadge status={e.status} />
               </div>
               <h3 className="mt-3 font-serif text-2xl italic">{e.title}</h3>
               <div className="mt-1 flex items-center gap-2 text-sm text-ink/60">
