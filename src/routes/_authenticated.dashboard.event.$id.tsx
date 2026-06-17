@@ -4,15 +4,15 @@ import { QRCodeSVG } from "qrcode.react";
 import { useRef, useState } from "react";
 import { toast } from "sonner";
 import {
-  getEventForHost, toggleEventActive, deletePhoto, deleteMemory, updateEventInvitation,
+  getEventForHost, deletePhoto, deleteMemory, updateEventInvitation,
 } from "@/lib/kenangan.functions";
-import { listEventAuditsForHost } from "@/lib/admin-events.functions";
 import { listActiveTemplates, getEventTemplates, setEventTemplates } from "@/lib/templates.functions";
 import { resizeImageToDataUrl } from "@/lib/image-resize";
 import { downloadFile, safeFilename } from "@/lib/download";
 import { exportZip } from "@/lib/zip-export";
 import { downloadQrPoster } from "@/lib/qr-poster";
-import { ArrowLeft, Copy, Download, Trash2, Upload, Power, Package, QrCode } from "lucide-react";
+import { StatusBadge } from "@/components/status-badge";
+import { ArrowLeft, Copy, Download, Trash2, Upload, Package, QrCode } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/dashboard/event/$id")({
   component: ManageEvent,
