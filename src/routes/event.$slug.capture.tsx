@@ -1,9 +1,11 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { FILTERS, getFilterCss, type FilterId } from "@/lib/filters";
 import { loadGuest } from "@/lib/guest-session";
 import { uploadPhoto } from "@/lib/kenangan.functions";
+import { listTemplatesForEvent, type TemplateRow } from "@/lib/templates.functions";
 import { RotateCcw, Circle, Printer } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
@@ -21,6 +23,13 @@ function Capture() {
   const [facing, setFacing] = useState<"user" | "environment">("environment");
   const [busy, setBusy] = useState(false);
   const [preview, setPreview] = useState<string | null>(null);
+  const [originalPreview, setOriginalPreview] = useState<string | null>(null);
+  const [templateId, setTemplateId] = useState<string | null>(null);
+
+  const { data: templates = [] } = useQuery({
+    queryKey: ["event-templates-public", slug],
+    queryFn: () => listTemplatesForEvent({ data: { slug } }),
+  });
 
   function printPhoto() {
     if (!preview) return;
@@ -55,7 +64,7 @@ function Capture() {
           videoRef.current.srcObject = stream;
           await videoRef.current.play();
         }
-      } catch (e) {
+      } catch {
         toast.error("Camera blocked. Allow camera access and refresh.");
       }
     }
@@ -63,7 +72,35 @@ function Capture() {
     return () => { cancelled = true; streamRef.current?.getTracks().forEach((t) => t.stop()); };
   }, [facing]);
 
-  function snap() {
+  function loadImage(src: string): Promise<HTMLImageElement> {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.crossOrigin = "anonymous";
+      img.onload = () => resolve(img);
+      img.onerror = reject;
+      img.src = src;
+    });
+  }
+
+  async function composite(baseDataUrl: string, tplId: string | null): Promise<string> {
+    if (!tplId) return baseDataUrl;
+    const tpl = templates.find((x) => x.id === tplId);
+    if (!tpl?.asset_url) return baseDataUrl;
+    try {
+      const [base, overlay] = await Promise.all([loadImage(baseDataUrl), loadImage(tpl.asset_url)]);
+      const canvas = document.createElement("canvas");
+      canvas.width = base.width; canvas.height = base.height;
+      const ctx = canvas.getContext("2d"); if (!ctx) return baseDataUrl;
+      ctx.drawImage(base, 0, 0);
+      ctx.drawImage(overlay, 0, 0, base.width, base.height);
+      return canvas.toDataURL("image/jpeg", 0.92);
+    } catch {
+      toast.error("Could not apply the template");
+      return baseDataUrl;
+    }
+  }
+
+  async function snap() {
     const v = videoRef.current; if (!v) return;
     const w = v.videoWidth, h = v.videoHeight;
     const canvas = document.createElement("canvas");
@@ -72,7 +109,18 @@ function Capture() {
     ctx.filter = getFilterCss(filter);
     if (facing === "user") { ctx.translate(w, 0); ctx.scale(-1, 1); }
     ctx.drawImage(v, 0, 0, w, h);
-    setPreview(canvas.toDataURL("image/jpeg", 0.9));
+    const original = canvas.toDataURL("image/jpeg", 0.9);
+    setOriginalPreview(original);
+    const composed = await composite(original, templateId);
+    setPreview(composed);
+  }
+
+  async function changeTemplate(id: string | null) {
+    setTemplateId(id);
+    if (originalPreview) {
+      const composed = await composite(originalPreview, id);
+      setPreview(composed);
+    }
   }
 
   async function send() {
@@ -81,11 +129,20 @@ function Capture() {
     if (!guest) return;
     setBusy(true);
     try {
-      await uploadPhoto({ data: { slug, guestId: guest.guestId, guestName: guest.name, filter, dataUrl: preview } });
+      await uploadPhoto({ data: {
+        slug, guestId: guest.guestId, guestName: guest.name, filter, dataUrl: preview,
+        originalDataUrl: templateId && originalPreview !== preview ? originalPreview : null,
+        templateId,
+      } });
       toast.success("Saved to the album");
-      setPreview(null);
+      setPreview(null); setOriginalPreview(null);
     } catch (e) { toast.error((e as Error).message); }
     finally { setBusy(false); }
+  }
+
+  function retake() {
+    setPreview(null);
+    setOriginalPreview(null);
   }
 
   return (
@@ -97,21 +154,37 @@ function Capture() {
         {preview ? (
           <img src={preview} className="h-full w-full object-cover" alt="preview" />
         ) : (
-          <video ref={videoRef} playsInline muted
-            style={{ filter: getFilterCss(filter), transform: facing === "user" ? "scaleX(-1)" : undefined }}
-            className="h-full w-full object-cover" />
-        )}
-        {!preview && (
-          <button onClick={() => setFacing((f) => (f === "user" ? "environment" : "user"))}
-            className="absolute right-3 top-3 grid h-9 w-9 place-items-center rounded-full bg-cream/80 text-ink">
-            <RotateCcw size={16} />
-          </button>
+          <>
+            <video ref={videoRef} playsInline muted
+              style={{ filter: getFilterCss(filter), transform: facing === "user" ? "scaleX(-1)" : undefined }}
+              className="h-full w-full object-cover" />
+            {templateId && templates.find((x) => x.id === templateId)?.asset_url && (
+              <img src={templates.find((x) => x.id === templateId)!.asset_url!} alt=""
+                className="pointer-events-none absolute inset-0 h-full w-full object-cover" />
+            )}
+            <button onClick={() => setFacing((f) => (f === "user" ? "environment" : "user"))}
+              className="absolute right-3 top-3 grid h-9 w-9 place-items-center rounded-full bg-cream/80 text-ink">
+              <RotateCcw size={16} />
+            </button>
+          </>
         )}
       </div>
 
       {!preview ? (
         <>
-          <div className="mt-4 flex gap-2 overflow-x-auto pb-2">
+          {templates.length > 0 && (
+            <div className="mt-4">
+              <div className="mb-1 text-[10px] uppercase tracking-[0.3em] text-ink/55">{t("booth.chooseTemplate")}</div>
+              <div className="flex gap-2 overflow-x-auto pb-2">
+                <TemplateChip active={templateId === null} onClick={() => setTemplateId(null)} label={t("booth.none")} />
+                {templates.map((tp) => (
+                  <TemplateChip key={tp.id} active={templateId === tp.id} onClick={() => setTemplateId(tp.id)}
+                    label={tp.name} thumb={tp.preview_url ?? tp.asset_url} />
+                ))}
+              </div>
+            </div>
+          )}
+          <div className="mt-2 flex gap-2 overflow-x-auto pb-2">
             {FILTERS.map((f) => (
               <button key={f.id} onClick={() => setFilter(f.id)}
                 className={`shrink-0 rounded-full border px-4 py-1.5 text-xs uppercase tracking-wider ${
@@ -130,8 +203,17 @@ function Capture() {
         </>
       ) : (
         <div className="mt-4 space-y-2">
+          {templates.length > 0 && (
+            <div className="flex gap-2 overflow-x-auto pb-1">
+              <TemplateChip active={templateId === null} onClick={() => changeTemplate(null)} label={t("booth.none")} />
+              {templates.map((tp) => (
+                <TemplateChip key={tp.id} active={templateId === tp.id} onClick={() => changeTemplate(tp.id)}
+                  label={tp.name} thumb={tp.preview_url ?? tp.asset_url} />
+              ))}
+            </div>
+          )}
           <div className="grid grid-cols-2 gap-2">
-            <button onClick={() => setPreview(null)} className="rounded-xl border border-ink/15 bg-card py-3">{t("booth.retake")}</button>
+            <button onClick={retake} className="rounded-xl border border-ink/15 bg-card py-3">{t("booth.retake")}</button>
             <button disabled={busy} onClick={send} className="rounded-xl bg-ink py-3 text-cream disabled:opacity-50">
               {busy ? "Sending…" : "Send to album"}
             </button>
@@ -144,3 +226,18 @@ function Capture() {
     </div>
   );
 }
+
+function TemplateChip({ active, onClick, label, thumb }: { active: boolean; onClick: () => void; label: string; thumb?: string | null }) {
+  return (
+    <button onClick={onClick}
+      className={`flex shrink-0 items-center gap-2 rounded-full border px-2 py-1 text-xs ${active ? "border-ink bg-ink text-cream" : "border-ink/15 bg-card text-ink/70"}`}>
+      <span className={`grid h-7 w-7 place-items-center overflow-hidden rounded-full ${active ? "bg-cream/20" : "bg-[repeating-conic-gradient(#eee_0_25%,#fff_0_50%)] bg-[length:10px_10px]"}`}>
+        {thumb ? <img src={thumb} alt="" className="h-full w-full object-contain" /> : <span>{active ? "✓" : "—"}</span>}
+      </span>
+      <span className="pr-2 italic">{label}</span>
+    </button>
+  );
+}
+
+// Silence unused warnings for templates row type in some bundlers
+export type _TemplateRowKeep = TemplateRow;
