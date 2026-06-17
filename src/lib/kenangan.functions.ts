@@ -266,7 +266,7 @@ export const listMyEvents = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     const { data, error } = await context.supabase
-      .from("events").select("id, slug, title, event_type, date, venue, is_active, created_at")
+      .from("events").select("id, slug, title, event_type, date, venue, status, max_guests, max_photos, max_notes, max_voice, max_prints, created_at")
       .eq("host_id", context.userId).order("created_at", { ascending: false });
     if (error) throw new Error(error.message);
 
