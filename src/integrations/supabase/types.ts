@@ -49,6 +49,45 @@ export type Database = {
           },
         ]
       }
+      event_templates: {
+        Row: {
+          created_at: string
+          event_id: string
+          id: string
+          sort_order: number
+          template_id: string
+        }
+        Insert: {
+          created_at?: string
+          event_id: string
+          id?: string
+          sort_order?: number
+          template_id: string
+        }
+        Update: {
+          created_at?: string
+          event_id?: string
+          id?: string
+          sort_order?: number
+          template_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "event_templates_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "event_templates_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "photo_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       events: {
         Row: {
           cover_image_url: string | null
@@ -237,6 +276,48 @@ export type Database = {
           },
         ]
       }
+      photo_templates: {
+        Row: {
+          asset_path: string
+          config: Json
+          created_at: string
+          created_by: string | null
+          id: string
+          is_active: boolean
+          kind: string
+          name: string
+          preview_path: string | null
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          asset_path: string
+          config?: Json
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_active?: boolean
+          kind: string
+          name: string
+          preview_path?: string | null
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          asset_path?: string
+          config?: Json
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_active?: boolean
+          kind?: string
+          name?: string
+          preview_path?: string | null
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       photos: {
         Row: {
           created_at: string
@@ -246,7 +327,9 @@ export type Database = {
           guest_name: string
           id: string
           media_type: string
+          original_url: string | null
           storage_url: string
+          template_id: string | null
         }
         Insert: {
           created_at?: string
@@ -256,7 +339,9 @@ export type Database = {
           guest_name: string
           id?: string
           media_type?: string
+          original_url?: string | null
           storage_url: string
+          template_id?: string | null
         }
         Update: {
           created_at?: string
@@ -266,7 +351,9 @@ export type Database = {
           guest_name?: string
           id?: string
           media_type?: string
+          original_url?: string | null
           storage_url?: string
+          template_id?: string | null
         }
         Relationships: [
           {
@@ -281,6 +368,13 @@ export type Database = {
             columns: ["guest_id"]
             isOneToOne: false
             referencedRelation: "guests"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "photos_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "photo_templates"
             referencedColumns: ["id"]
           },
         ]
