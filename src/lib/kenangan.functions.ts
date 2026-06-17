@@ -78,13 +78,15 @@ export const registerGuest = createServerFn({ method: "POST" })
   )
   .handler(async ({ data }) => {
     const sb = publicClient();
-    // Idempotent: existing session bypasses the cap.
-    const { data: eventRow } = await sb.from("events").select("id").eq("slug", data.slug).maybeSingle();
-    if (eventRow) {
-      const { data: existing } = await sb.from("guests")
-        .select("id, name").eq("event_id", eventRow.id).eq("session_token", data.sessionToken).maybeSingle();
-      if (existing) return { guestId: existing.id, name: existing.name };
-    }
+    // Idempotent: existing session bypasses the cap. Uses SECURITY DEFINER RPC
+    // so anon callers cannot enumerate guests / session tokens directly.
+    const { data: existing } = await sb.rpc("get_guest_by_token", {
+      p_slug: data.slug,
+      p_token: data.sessionToken,
+    });
+    const existingRow = Array.isArray(existing) ? existing[0] : existing;
+    if (existingRow) return { guestId: existingRow.id as string, name: existingRow.name as string };
+
     const event = await loadEventForGuestAction(sb, data.slug, { capTable: "guests", capCol: "max_guests" });
 
     const { data: inserted, error } = await sb.from("guests")
