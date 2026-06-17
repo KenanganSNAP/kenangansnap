@@ -206,8 +206,8 @@ export const listAlbum = createServerFn({ method: "GET" })
   .handler(async ({ data }) => {
     const sb = publicClient();
     const { data: event } = await sb.from("events")
-      .select("id, is_active, reveal_at").eq("slug", data.slug).maybeSingle();
-    if (!event || !event.is_active) return { revealed: false, revealAt: null, items: [] as PhotoItem[] };
+      .select("id, status, reveal_at").eq("slug", data.slug).maybeSingle();
+    if (!event || (event.status !== "active" && event.status !== "completed")) return { revealed: false, revealAt: null, items: [] as PhotoItem[] };
     const revealed = !event.reveal_at || new Date(event.reveal_at) <= new Date();
     if (!revealed) return { revealed: false, revealAt: event.reveal_at, items: [] };
 
