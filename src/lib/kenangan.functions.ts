@@ -89,11 +89,18 @@ export const registerGuest = createServerFn({ method: "POST" })
 
       const event = await loadEventForGuestAction(sb, data.slug, { capTable: "guests", capCol: "max_guests" });
 
-      const { data: inserted, error } = await sb.from("guests")
-        .insert({ event_id: event.id, name: data.name, session_token: data.sessionToken })
-        .select("id, name").single();
+      const { error } = await sb.from("guests")
+        .insert({ event_id: event.id, name: data.name, session_token: data.sessionToken });
       if (error) { console.error("[registerGuest] insert guests failed:", error); throw new Error(error.message); }
-      return { guestId: inserted.id, name: inserted.name };
+
+      const { data: created, error: lookupErr } = await sb.rpc("get_guest_by_token", {
+        p_slug: data.slug,
+        p_token: data.sessionToken,
+      });
+      if (lookupErr) { console.error("[registerGuest] rpc get_guest_by_token after insert failed:", lookupErr); throw new Error(lookupErr.message); }
+      const createdRow = Array.isArray(created) ? created[0] : created;
+      if (!createdRow) throw new Error("Guest registration could not be confirmed");
+      return { guestId: createdRow.id as string, name: createdRow.name as string };
     } catch (err) {
       console.error("[registerGuest] failed for slug=", data.slug, "err=", err);
       throw err;
