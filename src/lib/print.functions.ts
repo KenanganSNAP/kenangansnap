@@ -106,7 +106,9 @@ export const submitPrintJob = createServerFn({ method: "POST" })
   )
   .handler(async ({ data }) => {
     const sb = publicClient();
-    const cfg = await loadConfig(sb);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: row } = await supabaseAdmin.from("site_settings").select("settings").eq("key", "print_config").maybeSingle();
+    const cfg: PrintConfigFull = { ...defaults, ...((row?.settings as Partial<PrintConfigFull>) ?? {}) };
     if (!cfg.enabled || !cfg.url) throw new Error("Printing is not configured");
     const copies = cfg.allow_override
       ? Math.min(Math.max(data.copies, 1), cfg.max_copies)
