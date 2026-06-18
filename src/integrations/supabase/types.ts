@@ -519,6 +519,14 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      _storage_event_id: { Args: { p_name: string }; Returns: string }
+      get_guest_by_token: {
+        Args: { p_slug: string; p_token: string }
+        Returns: {
+          id: string
+          name: string
+        }[]
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
