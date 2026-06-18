@@ -67,31 +67,42 @@ export const getEventBySlug = createServerFn({ method: "GET" })
     return { ...event, cover_signed_url: coverUrl, invitation_signed_url: inviteUrl };
   });
 
-// PUBLIC: Register guest
+// PUBLIC: Register guest. Session token is generated server-side via a
+// SECURITY DEFINER RPC so callers cannot pre-seed/impersonate tokens.
 export const registerGuest = createServerFn({ method: "POST" })
-  .inputValidator((d: { slug: string; name: string; sessionToken: string }) =>
+  .inputValidator((d: { slug: string; name: string; sessionToken?: string | null }) =>
     z.object({
       slug: z.string().min(1),
       name: z.string().min(1).max(60),
-      sessionToken: z.string().min(8),
+      sessionToken: z.string().min(8).max(128).nullable().optional(),
     }).parse(d),
   )
   .handler(async ({ data }) => {
     const sb = publicClient();
-    // Idempotent: existing session bypasses the cap.
-    const { data: eventRow } = await sb.from("events").select("id").eq("slug", data.slug).maybeSingle();
-    if (eventRow) {
-      const { data: existing } = await sb.from("guests")
-        .select("id, name").eq("event_id", eventRow.id).eq("session_token", data.sessionToken).maybeSingle();
-      if (existing) return { guestId: existing.id, name: existing.name };
+    // Idempotent path: if the browser already has a token from a prior
+    // registration on this device, reuse that row (and its existing token).
+    if (data.sessionToken) {
+      const { data: eventRow } = await sb.from("events").select("id").eq("slug", data.slug).maybeSingle();
+      if (eventRow) {
+        const { data: existing } = await sb.from("guests")
+          .select("id, name, session_token")
+          .eq("event_id", eventRow.id)
+          .eq("session_token", data.sessionToken)
+          .maybeSingle();
+        if (existing) {
+          return { guestId: existing.id, name: existing.name, sessionToken: existing.session_token };
+        }
+      }
     }
-    const event = await loadEventForGuestAction(sb, data.slug, { capTable: "guests", capCol: "max_guests" });
 
-    const { data: inserted, error } = await sb.from("guests")
-      .insert({ event_id: event.id, name: data.name, session_token: data.sessionToken })
-      .select("id, name").single();
+    const { data: rows, error } = await sb.rpc("register_guest", {
+      p_slug: data.slug,
+      p_name: data.name,
+    });
     if (error) throw new Error(error.message);
-    return { guestId: inserted.id, name: inserted.name };
+    const row = Array.isArray(rows) ? rows[0] : rows;
+    if (!row) throw new Error("Could not register guest");
+    return { guestId: row.guest_id, name: row.guest_name, sessionToken: row.session_token };
   });
 
 // PUBLIC: Upload photo (data URL base64 from canvas)
