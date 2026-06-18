@@ -90,8 +90,7 @@ export const registerGuest = createServerFn({ method: "POST" })
       const event = await loadEventForGuestAction(sb, data.slug, { capTable: "guests", capCol: "max_guests" });
 
       const { error } = await sb.from("guests")
-        .insert({ event_id: event.id, name: data.name, session_token: data.sessionToken })
-        .select(undefined, { head: true });
+        .insert({ event_id: event.id, name: data.name, session_token: data.sessionToken });
       if (error) { console.error("[registerGuest] insert guests failed:", error); throw new Error(error.message); }
 
       const { data: created, error: lookupErr } = await sb.rpc("get_guest_by_token", {
