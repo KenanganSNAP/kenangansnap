@@ -77,23 +77,27 @@ export const registerGuest = createServerFn({ method: "POST" })
     }).parse(d),
   )
   .handler(async ({ data }) => {
-    const sb = publicClient();
-    // Idempotent: existing session bypasses the cap. Uses SECURITY DEFINER RPC
-    // so anon callers cannot enumerate guests / session tokens directly.
-    const { data: existing } = await sb.rpc("get_guest_by_token", {
-      p_slug: data.slug,
-      p_token: data.sessionToken,
-    });
-    const existingRow = Array.isArray(existing) ? existing[0] : existing;
-    if (existingRow) return { guestId: existingRow.id as string, name: existingRow.name as string };
+    try {
+      const sb = publicClient();
+      const { data: existing, error: rpcErr } = await sb.rpc("get_guest_by_token", {
+        p_slug: data.slug,
+        p_token: data.sessionToken,
+      });
+      if (rpcErr) { console.error("[registerGuest] rpc get_guest_by_token failed:", rpcErr); throw new Error(rpcErr.message); }
+      const existingRow = Array.isArray(existing) ? existing[0] : existing;
+      if (existingRow) return { guestId: existingRow.id as string, name: existingRow.name as string };
 
-    const event = await loadEventForGuestAction(sb, data.slug, { capTable: "guests", capCol: "max_guests" });
+      const event = await loadEventForGuestAction(sb, data.slug, { capTable: "guests", capCol: "max_guests" });
 
-    const { data: inserted, error } = await sb.from("guests")
-      .insert({ event_id: event.id, name: data.name, session_token: data.sessionToken })
-      .select("id, name").single();
-    if (error) throw new Error(error.message);
-    return { guestId: inserted.id, name: inserted.name };
+      const { data: inserted, error } = await sb.from("guests")
+        .insert({ event_id: event.id, name: data.name, session_token: data.sessionToken })
+        .select("id, name").single();
+      if (error) { console.error("[registerGuest] insert guests failed:", error); throw new Error(error.message); }
+      return { guestId: inserted.id, name: inserted.name };
+    } catch (err) {
+      console.error("[registerGuest] failed for slug=", data.slug, "err=", err);
+      throw err;
+    }
   });
 
 // PUBLIC: Upload photo (data URL base64 from canvas)
