@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { getEventBySlug, registerGuest } from "@/lib/kenangan.functions";
-import { hasSeenInvitation, loadGuest, markInvitationSeen, newSessionToken, saveGuest } from "@/lib/guest-session";
+import { hasSeenInvitation, loadGuest, markInvitationSeen, saveGuest } from "@/lib/guest-session";
 import { BrandMark } from "@/components/brand-mark";
 import { ChevronDown } from "lucide-react";
 
