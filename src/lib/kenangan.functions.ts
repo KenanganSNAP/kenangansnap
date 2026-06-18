@@ -77,34 +77,21 @@ export const registerGuest = createServerFn({ method: "POST" })
     }).parse(d),
   )
   .handler(async ({ data }) => {
-    try {
-      const sb = publicClient();
-      const { data: existing, error: rpcErr } = await sb.rpc("get_guest_by_token", {
-        p_slug: data.slug,
-        p_token: data.sessionToken,
-      });
-      if (rpcErr) { console.error("[registerGuest] rpc get_guest_by_token failed:", rpcErr); throw new Error(rpcErr.message); }
-      const existingRow = Array.isArray(existing) ? existing[0] : existing;
-      if (existingRow) return { guestId: existingRow.id as string, name: existingRow.name as string };
-
-      const event = await loadEventForGuestAction(sb, data.slug, { capTable: "guests", capCol: "max_guests" });
-
-      const { error } = await sb.from("guests")
-        .insert({ event_id: event.id, name: data.name, session_token: data.sessionToken });
-      if (error) { console.error("[registerGuest] insert guests failed:", error); throw new Error(error.message); }
-
-      const { data: created, error: lookupErr } = await sb.rpc("get_guest_by_token", {
-        p_slug: data.slug,
-        p_token: data.sessionToken,
-      });
-      if (lookupErr) { console.error("[registerGuest] rpc get_guest_by_token after insert failed:", lookupErr); throw new Error(lookupErr.message); }
-      const createdRow = Array.isArray(created) ? created[0] : created;
-      if (!createdRow) throw new Error("Guest registration could not be confirmed");
-      return { guestId: createdRow.id as string, name: createdRow.name as string };
-    } catch (err) {
-      console.error("[registerGuest] failed for slug=", data.slug, "err=", err);
-      throw err;
+    const sb = publicClient();
+    // Idempotent: existing session bypasses the cap.
+    const { data: eventRow } = await sb.from("events").select("id").eq("slug", data.slug).maybeSingle();
+    if (eventRow) {
+      const { data: existing } = await sb.from("guests")
+        .select("id, name").eq("event_id", eventRow.id).eq("session_token", data.sessionToken).maybeSingle();
+      if (existing) return { guestId: existing.id, name: existing.name };
     }
+    const event = await loadEventForGuestAction(sb, data.slug, { capTable: "guests", capCol: "max_guests" });
+
+    const { data: inserted, error } = await sb.from("guests")
+      .insert({ event_id: event.id, name: data.name, session_token: data.sessionToken })
+      .select("id, name").single();
+    if (error) throw new Error(error.message);
+    return { guestId: inserted.id, name: inserted.name };
   });
 
 // PUBLIC: Upload photo (data URL base64 from canvas)
