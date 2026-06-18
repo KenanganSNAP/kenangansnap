@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { getEventBySlug, registerGuest } from "@/lib/kenangan.functions";
-import { hasSeenInvitation, loadGuest, markInvitationSeen, newSessionToken, saveGuest } from "@/lib/guest-session";
+import { hasSeenInvitation, loadGuest, markInvitationSeen, saveGuest } from "@/lib/guest-session";
 import { BrandMark } from "@/components/brand-mark";
 import { ChevronDown } from "lucide-react";
 
@@ -37,9 +37,8 @@ function GuestHome() {
     setBusy(true);
     try {
       const existing = loadGuest(slug);
-      const sessionToken = existing?.sessionToken ?? newSessionToken();
-      const { guestId } = await registerGuest({ data: { slug, name: name.trim(), sessionToken } });
-      saveGuest(slug, { guestId, name: name.trim(), sessionToken });
+      const result = await registerGuest({ data: { slug, name: name.trim(), sessionToken: existing?.sessionToken ?? null } });
+      saveGuest(slug, { guestId: result.guestId, name: result.name, sessionToken: result.sessionToken });
       nav({ to: "/event/$slug/capture", params: { slug } });
     } catch (err) {
       toast.error((err as Error).message);
