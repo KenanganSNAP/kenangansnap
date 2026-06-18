@@ -37,9 +37,8 @@ function GuestHome() {
     setBusy(true);
     try {
       const existing = loadGuest(slug);
-      const sessionToken = existing?.sessionToken ?? newSessionToken();
-      const { guestId } = await registerGuest({ data: { slug, name: name.trim(), sessionToken } });
-      saveGuest(slug, { guestId, name: name.trim(), sessionToken });
+      const result = await registerGuest({ data: { slug, name: name.trim(), sessionToken: existing?.sessionToken ?? null } });
+      saveGuest(slug, { guestId: result.guestId, name: result.name, sessionToken: result.sessionToken });
       nav({ to: "/event/$slug/capture", params: { slug } });
     } catch (err) {
       toast.error((err as Error).message);
