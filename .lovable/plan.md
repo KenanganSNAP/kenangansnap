@@ -1,63 +1,34 @@
-## Goal
-On `/auth`, when a new user chooses to sign up, show the **contact details form first** (step 1), then the **email/password account creation** (step 2). Sign-in flow stays unchanged.
+## Why the guest is hitting "row level security"
 
-## Flow
+When a guest (or even you, while signed in as the host) opens `/event/<slug>` and submits their name, the browser calls the public server function `registerGuest`. That function uses an **anon** Supabase client and does three things in order:
 
-```text
-Click "Host an event"
-        ↓
-   /auth (signin)
-        ↓ "Create an account"
-   Step 1 — Contact details
-   • Full name (required)
-   • Phone / WhatsApp (required)
-   • Company / organization (optional)
-   • Event interest (required, textarea)
-        ↓ "Continue →"
-   Step 2 — Account
-   • Email (required)
-   • Password (required, min 6)
-        ↓ "Create account →"
-   supabase.auth.signUp(email, password)
-        ↓ session established
-   updateMyContactInfo({ ...step1, submit: true })
-        ↓
-   Redirect to /dashboard → bounced to /dashboard/pending
-   (shows read-only "Awaiting Approval" summary with Edit option)
-```
+1. `get_guest_by_token` RPC — exists, anon has EXECUTE. Fine.
+2. `loadEventForGuestAction` — `SELECT` on `events` by slug, then a `count` on `guests` for the cap check.
+3. `INSERT` into `guests`.
 
-## Changes
+I checked the current database state and the most plausible cause of "row level security" coming back to the UI is step 2's cap check, not the insert:
 
-**`src/routes/auth.tsx`** (only file with UI changes)
-- Add `signupStep` state (`"contact" | "account"`) — defaults to `"contact"` when `mode === "signup"`.
-- Add state for `fullName`, `phone`, `company`, `eventInterest`.
-- When `mode === "signin"`: render existing email/password form as-is.
-- When `mode === "signup"` and `signupStep === "contact"`:
-  - Render the contact form fields.
-  - "Continue →" button validates required fields client-side, then sets `signupStep = "account"`.
-  - Show a small step indicator ("Step 1 of 2 — Your details").
-  - Hide the Google button on step 1 (Google sign-in needs a different flow since it skips email/password — see below).
-- When `mode === "signup"` and `signupStep === "account"`:
-  - Render email + password fields.
-  - "Back" link returns to step 1 (preserves entered values).
-  - On submit: call `supabase.auth.signUp`, then once the session exists call `updateMyContactInfo({ full_name, phone, company, event_interest, submit: true })`, then navigate to `/dashboard` (pending page takes over).
-  - Step indicator: "Step 2 of 2 — Account".
-- Toggling back to "Sign in" clears the signup state cleanly.
+- The recent security tightening removed every `SELECT` policy on `guests` for `anon`. With RLS on and no anon SELECT policy, the count query (`select id, count: exact, head: true`) is a SELECT against `guests` from `anon`. In Supabase that returns `count: 0` silently rather than raising — **but** any `select(...)` follow-up after a previous error in the same request chain surfaces as a generic "row level security" toast in the UI, which matches what you saw.
+- The actual `INSERT` policy on `guests` for `anon` is correct (`is_active = true`) and both of your events have `is_active = t`, so the insert itself is not the blocker.
 
-**Google OAuth on signup**
-- Google users come back authenticated with no contact info yet. They'll land on `/dashboard/pending` and fill the existing form there — no change needed.
-- Keep the Google button visible on the sign-in view and on signup step 2; hide on step 1 to avoid bypassing the contact step in the email/password flow.
+I want to confirm by reading the exact error before changing policies. Two-step plan:
 
-## What does NOT change
-- `updateMyContactInfo` server function (already accepts `submit: true` and validates required fields).
-- `/dashboard/pending` page (still the fallback for Google signups and for edits).
-- Admin tabs and notification counts (still keyed off `contact_submitted`).
-- No database changes.
+### Step 1 — capture the real error (no DB change)
 
-## Validation
-- Client-side: required fields enforced before allowing "Continue →".
-- Server-side: `updateMyContactInfo` already validates `full_name`, `phone`, `event_interest` when `submit: true`.
+Add a server-side `console.error(err)` inside `registerGuest`'s `try` path and re-throw, so the failing call shows up in the server-function logs with the Postgres error code (`42501` = grant, `PGRST…` = policy, etc.). Then ask you to retry once and read the log.
 
-## Edge cases
-- If `signUp` succeeds but `updateMyContactInfo` fails (network), user lands on `/dashboard/pending` and can submit from there — no data loss because the pending form re-collects the same fields.
-- If user refreshes mid-signup, state resets — acceptable since no account yet exists.
+### Step 2 — fix based on what we see
+
+Whichever of these the log points at:
+
+- **If `42501` / "permission denied for table guests"** → the count query is being denied at the GRANT level (not RLS). Add a narrow `SELECT` policy on `guests` for `anon` scoped to `session_token = current_setting('request.jwt.claim.session_token', true)` is overkill; simpler: drop the count from `loadEventForGuestAction` for the guests cap and instead expose a `SECURITY DEFINER` RPC `count_guests_for_event(p_slug)` that anon can call. This keeps `guests` un-readable to anon while still letting the cap check work.
+- **If "new row violates RLS for table guests"** → the only way that fires is `events.is_active` being false at insert time. We'd add a clearer error message ("This event isn't open for guests yet") instead of the generic RLS toast.
+- **If it's actually a storage policy** (signed URL generation for invitation/cover) → relax the anon SELECT predicate on `event-covers`/`event-invitations` from `is_active = true` to also allow the host viewing their own event.
+
+### What stays untouched
+
+- The `INSERT` policies on `guests` (already correct).
+- The `events` SELECT policies.
+- The admin / host policies on everything.
+
+After Step 1 I'll come back with the exact log line and the targeted fix from Step 2 — no schema change happens until then.
