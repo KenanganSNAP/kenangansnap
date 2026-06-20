@@ -78,20 +78,27 @@ export const registerGuest = createServerFn({ method: "POST" })
   )
   .handler(async ({ data }) => {
     const sb = publicClient();
-    // Idempotent: existing session bypasses the cap.
-    const { data: eventRow } = await sb.from("events").select("id").eq("slug", data.slug).maybeSingle();
-    if (eventRow) {
-      const { data: existing } = await sb.from("guests")
-        .select("id, name").eq("event_id", eventRow.id).eq("session_token", data.sessionToken).maybeSingle();
-      if (existing) return { guestId: existing.id, name: existing.name };
-    }
-    const event = await loadEventForGuestAction(sb, data.slug, { capTable: "guests", capCol: "max_guests" });
+    // Idempotent: existing session bypasses the cap (read via SECURITY DEFINER RPC so anon RLS doesn't block).
+    const { data: existing } = await sb.rpc("get_guest_by_token", {
+      p_slug: data.slug,
+      p_token: data.sessionToken,
+    });
+    const existingRow = Array.isArray(existing) ? existing[0] : existing;
+    if (existingRow?.id) return { guestId: existingRow.id, name: existingRow.name };
 
-    const { data: inserted, error } = await sb.from("guests")
-      .insert({ event_id: event.id, name: data.name, session_token: data.sessionToken })
-      .select("id, name").single();
+    // Register via SECURITY DEFINER RPC (enforces active event + max_guests cap).
+    const { data: registered, error } = await sb.rpc("register_guest", {
+      p_slug: data.slug,
+      p_name: data.name,
+    });
     if (error) throw new Error(error.message);
-    return { guestId: inserted.id, name: inserted.name };
+    const row = Array.isArray(registered) ? registered[0] : registered;
+    if (!row?.guest_id) throw new Error("Failed to register guest");
+    // Persist the client-provided session token onto the new guest via a second RPC-less path.
+    // The RPC mints its own token; we map it back to the client token by updating with admin client.
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    await supabaseAdmin.from("guests").update({ session_token: data.sessionToken }).eq("id", row.guest_id);
+    return { guestId: row.guest_id as string, name: row.guest_name as string };
   });
 
 // PUBLIC: Upload photo (data URL base64 from canvas)
