@@ -47,14 +47,11 @@ async function loadConfig(sb: ReturnType<typeof publicClient>): Promise<PrintCon
   return { ...defaults, ...((data?.settings as Partial<PrintConfigFull>) ?? {}) };
 }
 
-// PUBLIC: safe-field config for booth UI. Loads via service-role inside the
-// handler because the `print_config` row is no longer readable by anon (it
-// holds the print service secret). We project only non-sensitive fields.
+// PUBLIC: safe-field config for booth UI
 export const getPrintConfigPublic = createServerFn({ method: "GET" })
   .handler(async (): Promise<PrintConfigPublic> => {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { data } = await supabaseAdmin.from("site_settings").select("settings").eq("key", "print_config").maybeSingle();
-    const cfg: PrintConfigFull = { ...defaults, ...((data?.settings as Partial<PrintConfigFull>) ?? {}) };
+    const sb = publicClient();
+    const cfg = await loadConfig(sb);
     return {
       enabled: cfg.enabled && cfg.url.length > 0,
       default_copies: cfg.default_copies,
@@ -106,9 +103,7 @@ export const submitPrintJob = createServerFn({ method: "POST" })
   )
   .handler(async ({ data }) => {
     const sb = publicClient();
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { data: row } = await supabaseAdmin.from("site_settings").select("settings").eq("key", "print_config").maybeSingle();
-    const cfg: PrintConfigFull = { ...defaults, ...((row?.settings as Partial<PrintConfigFull>) ?? {}) };
+    const cfg = await loadConfig(sb);
     if (!cfg.enabled || !cfg.url) throw new Error("Printing is not configured");
     const copies = cfg.allow_override
       ? Math.min(Math.max(data.copies, 1), cfg.max_copies)
