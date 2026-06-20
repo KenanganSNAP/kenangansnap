@@ -78,26 +78,15 @@ export const registerGuest = createServerFn({ method: "POST" })
   )
   .handler(async ({ data }) => {
     const sb = publicClient();
-    // Idempotent: existing session bypasses the cap (read via SECURITY DEFINER RPC so anon RLS doesn't block).
-    const { data: existing } = await sb.rpc("get_guest_by_token", {
-      p_slug: data.slug,
-      p_token: data.sessionToken,
-    });
-    const existingRow = Array.isArray(existing) ? existing[0] : existing;
-    if (existingRow?.id) return { guestId: existingRow.id, name: existingRow.name };
-
-    // Register via SECURITY DEFINER RPC (enforces active event + max_guests cap).
+    // SECURITY DEFINER RPC enforces active event + max_guests cap and is idempotent on (event, session_token).
     const { data: registered, error } = await sb.rpc("register_guest", {
       p_slug: data.slug,
       p_name: data.name,
+      p_token: data.sessionToken,
     });
     if (error) throw new Error(error.message);
     const row = Array.isArray(registered) ? registered[0] : registered;
     if (!row?.guest_id) throw new Error("Failed to register guest");
-    // Persist the client-provided session token onto the new guest via a second RPC-less path.
-    // The RPC mints its own token; we map it back to the client token by updating with admin client.
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    await supabaseAdmin.from("guests").update({ session_token: data.sessionToken }).eq("id", row.guest_id);
     return { guestId: row.guest_id as string, name: row.guest_name as string };
   });
 
