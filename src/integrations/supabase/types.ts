@@ -542,6 +542,36 @@ export type Database = {
           session_token: string
         }[]
       }
+      submit_guest_note: {
+        Args: {
+          p_content: string
+          p_guest_id: string
+          p_guest_name: string
+          p_slug: string
+        }
+        Returns: string
+      }
+      submit_guest_photo: {
+        Args: {
+          p_filter_applied?: string
+          p_guest_id: string
+          p_guest_name: string
+          p_original_url?: string
+          p_slug: string
+          p_storage_url: string
+          p_template_id?: string
+        }
+        Returns: string
+      }
+      submit_guest_voice: {
+        Args: {
+          p_audio_url: string
+          p_guest_id: string
+          p_guest_name: string
+          p_slug: string
+        }
+        Returns: string
+      }
     }
     Enums: {
       app_role: "admin" | "host"
