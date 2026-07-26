@@ -1,23 +1,32 @@
-## Problem
+## Plan
 
-The `register_guest` Postgres RPC (added in `supabase/migrations/20260620135432_*.sql`) falls back to `encode(gen_random_bytes(32), 'hex')` when no session token is passed. `gen_random_bytes` lives in the `pgcrypto` extension, which isn't enabled on this project, so the call throws `function gen_random_bytes(integer) does not exist` and blocks any guest from entering the event after tapping "Open Camera".
+1. **Fix the guest write path for photos, notes, and voice**
+   - Add database-backed guest submission functions for:
+     - sending a photo to the album
+     - sending a written wish
+     - uploading a voice memory
+   - These will follow the same safer pattern already used for guest registration.
 
-## Fix
+2. **Validate every guest submission before saving**
+   - Confirm the event exists and is currently `active`.
+   - Confirm the guest ID belongs to that event.
+   - Enforce the admin-set limits for photos, notes, and voice messages.
+   - Reject invalid or mismatched guest names, event slugs, photo paths, audio paths, and note content.
 
-Ship one new migration that replaces the `register_guest` function so its token fallback no longer depends on `pgcrypto`. Use `gen_random_uuid()::text` (already available via pgcrypto/pgsql defaults used elsewhere in the schema, e.g. `gen_random_uuid()` in table defaults) — no extension change needed.
+3. **Remove the fragile direct table inserts from the public guest flow**
+   - Update the app functions so `Send to album`, `Send wish`, and voice upload call the new validated backend/database functions instead of inserting directly into `photos` or `memories`.
+   - Keep the existing guest pages and UI unchanged.
 
-Change inside the function body:
+4. **Align access rules with the newer event status system**
+   - Update the relevant photo/audio storage and guest-submission rules to use `status = active` consistently, instead of relying on the older `is_active` field.
+   - This prevents future mismatches when admin changes event status.
 
-```sql
-v_token := COALESCE(NULLIF(p_token, ''), replace(gen_random_uuid()::text, '-', ''));
-```
+5. **Verify the full guest flow**
+   - Re-test: scan/open event link → enter guest name → open camera → take picture → send to album.
+   - Re-test: Notes → type wish → send.
+   - Re-test: Voice → record → stop/upload.
+   - Confirm rows are saved and no row-level security errors appear.
 
-Everything else in the function (capacity checks, upsert-by-token, insert path) stays identical. Keep the same `SECURITY DEFINER`, `search_path`, and grants.
+## About connecting your own backend account
 
-In practice the client always passes a `sessionToken` from `newSessionToken()`, so this fallback is rarely hit — but it must not error when it is.
-
-## Verification
-
-1. From the guest URL (`/event/<slug>`), enter a name and tap "Open Camera" — registration succeeds and the camera page loads.
-2. Re-enter with the same browser (same stored token) — no duplicate row, same `guestId` returned (idempotency preserved).
-3. No other code changes; guest/host/admin flows are untouched.
+This project is already running on Lovable Cloud, which provides the database, auth, storage, and server functions for the app. You do not need to connect a separate external backend account to fix this issue. If you want to migrate the project to a separate external account later, we should treat that as a separate migration task after the guest upload bugs are fixed.
