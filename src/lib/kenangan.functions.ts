@@ -105,7 +105,7 @@ export const uploadPhoto = createServerFn({ method: "POST" })
   )
   .handler(async ({ data }) => {
     const sb = publicClient();
-    const event = await loadEventForGuestAction(sb, data.slug, { capTable: "photos", capCol: "max_photos" });
+    const event = await loadEventForGuestAction(sb, data.slug);
 
     async function uploadDataUrl(dataUrl: string) {
       const [meta, b64] = dataUrl.split(",");
@@ -122,18 +122,17 @@ export const uploadPhoto = createServerFn({ method: "POST" })
     let originalPath: string | null = null;
     if (data.originalDataUrl) originalPath = await uploadDataUrl(data.originalDataUrl);
 
-    const { error: insErr, data: row } = await sb.from("photos").insert({
-      event_id: event.id,
-      guest_id: data.guestId,
-      guest_name: data.guestName,
-      storage_url: path,
-      media_type: "photo",
-      filter_applied: data.filter,
-      original_url: originalPath,
-      template_id: data.templateId ?? null,
-    }).select("id").single();
+    const { error: insErr, data: photoId } = await sb.rpc("submit_guest_photo", {
+      p_slug: data.slug,
+      p_guest_id: data.guestId,
+      p_guest_name: data.guestName,
+      p_storage_url: path,
+      p_filter_applied: data.filter,
+      p_original_url: originalPath,
+      p_template_id: data.templateId ?? null,
+    });
     if (insErr) throw new Error(insErr.message);
-    return { id: row.id };
+    return { id: photoId };
   });
 
 // PUBLIC: Upload voice
@@ -148,7 +147,7 @@ export const uploadVoice = createServerFn({ method: "POST" })
   )
   .handler(async ({ data }) => {
     const sb = publicClient();
-    const event = await loadEventForGuestAction(sb, data.slug, { capTable: "memories", capCol: "max_voice", memoryType: "voice" });
+    const event = await loadEventForGuestAction(sb, data.slug);
 
     const [meta, b64] = data.dataUrl.split(",");
     const mime = meta.match(/data:(.*?);base64/)?.[1] ?? "audio/webm";
@@ -161,15 +160,14 @@ export const uploadVoice = createServerFn({ method: "POST" })
     });
     if (upErr) throw new Error(upErr.message);
 
-    const { error, data: row } = await sb.from("memories").insert({
-      event_id: event.id,
-      guest_id: data.guestId,
-      guest_name: data.guestName,
-      type: "voice",
-      audio_url: path,
-    }).select("id").single();
+    const { error, data: memoryId } = await sb.rpc("submit_guest_voice", {
+      p_slug: data.slug,
+      p_guest_id: data.guestId,
+      p_guest_name: data.guestName,
+      p_audio_url: path,
+    });
     if (error) throw new Error(error.message);
-    return { id: row.id };
+    return { id: memoryId };
   });
 
 // PUBLIC: Submit note
@@ -184,16 +182,14 @@ export const submitNote = createServerFn({ method: "POST" })
   )
   .handler(async ({ data }) => {
     const sb = publicClient();
-    const event = await loadEventForGuestAction(sb, data.slug, { capTable: "memories", capCol: "max_notes", memoryType: "note" });
-    const { error, data: row } = await sb.from("memories").insert({
-      event_id: event.id,
-      guest_id: data.guestId,
-      guest_name: data.guestName,
-      type: "note",
-      content: data.content,
-    }).select("id").single();
+    const { error, data: memoryId } = await sb.rpc("submit_guest_note", {
+      p_slug: data.slug,
+      p_guest_id: data.guestId,
+      p_guest_name: data.guestName,
+      p_content: data.content,
+    });
     if (error) throw new Error(error.message);
-    return { id: row.id };
+    return { id: memoryId };
   });
 
 // PUBLIC: List album (enforces reveal time + signed URLs)
