@@ -128,8 +128,8 @@ export const uploadPhoto = createServerFn({ method: "POST" })
       p_guest_name: data.guestName,
       p_storage_url: path,
       p_filter_applied: data.filter,
-      p_original_url: originalPath,
-      p_template_id: data.templateId ?? null,
+      p_original_url: originalPath ?? undefined,
+      p_template_id: data.templateId ?? undefined,
     });
     if (insErr) throw new Error(insErr.message);
     return { id: photoId };
