@@ -80,6 +80,21 @@ function Capture() {
     return () => { cancelled = true; streamRef.current?.getTracks().forEach((t) => t.stop()); };
   }, [facing]);
 
+  // Re-attach the live stream whenever we leave the preview state (or return to the tab)
+  useEffect(() => {
+    if (preview) return;
+    function reattach() {
+      const v = videoRef.current;
+      const stream = streamRef.current;
+      if (!v || !stream) return;
+      if (v.srcObject !== stream) v.srcObject = stream;
+      if (v.paused) v.play().catch(() => {});
+    }
+    reattach();
+    document.addEventListener("visibilitychange", reattach);
+    return () => document.removeEventListener("visibilitychange", reattach);
+  }, [preview]);
+
   function loadImage(src: string): Promise<HTMLImageElement> {
     return new Promise((resolve, reject) => {
       const img = new Image();
