@@ -156,7 +156,9 @@ function Capture() {
         slug, guestId: guest.guestId, guestName: guest.name, filter, dataUrl: preview,
         originalDataUrl: templateId && originalPreview !== preview ? originalPreview : null,
         templateId,
+        allowDownload: guest.allowDownload !== false,
       } });
+
       toast.success("Saved to the album");
       setPreview(null); setOriginalPreview(null);
     } catch (e) { toast.error((e as Error).message); }
