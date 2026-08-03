@@ -16,6 +16,8 @@ export const Route = createFileRoute("/event/$slug/")({
 function GuestHome() {
   const { slug } = Route.useParams();
   const nav = useNavigate();
+  const { t } = useTranslation();
+
   const { data: event } = useQuery({
     queryKey: ["event-public", slug],
     queryFn: () => getEventBySlug({ data: { slug } }),
