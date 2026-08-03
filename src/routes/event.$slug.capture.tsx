@@ -159,18 +159,15 @@ function Capture() {
     <div className="fixed inset-0 z-40 overflow-hidden bg-ink">
       {/* Camera / preview surface */}
       <div className="absolute inset-0">
-        {preview ? (
-          <img src={preview} className="h-full w-full object-cover" alt="preview" />
-        ) : (
-          <>
-            <video ref={videoRef} playsInline muted
-              style={{ filter: getFilterCss(filter), transform: facing === "user" ? "scaleX(-1)" : undefined }}
-              className="h-full w-full object-cover" />
-            {activeTpl?.asset_url && (
-              <img src={activeTpl.asset_url} alt=""
-                className="pointer-events-none absolute inset-0 h-full w-full object-cover" />
-            )}
-          </>
+        <video ref={videoRef} playsInline muted autoPlay
+          style={{ filter: getFilterCss(filter), transform: facing === "user" ? "scaleX(-1)" : undefined }}
+          className="h-full w-full object-cover" />
+        {!preview && activeTpl?.asset_url && (
+          <img src={activeTpl.asset_url} alt=""
+            className="pointer-events-none absolute inset-0 h-full w-full object-cover" />
+        )}
+        {preview && (
+          <img src={preview} className="absolute inset-0 h-full w-full object-cover" alt="preview" />
         )}
       </div>
 
