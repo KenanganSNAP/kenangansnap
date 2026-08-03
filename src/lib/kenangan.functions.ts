@@ -92,7 +92,7 @@ export const registerGuest = createServerFn({ method: "POST" })
 
 // PUBLIC: Upload photo (data URL base64 from canvas)
 export const uploadPhoto = createServerFn({ method: "POST" })
-  .inputValidator((d: { slug: string; guestId: string; guestName: string; filter: string; dataUrl: string; originalDataUrl?: string | null; templateId?: string | null }) =>
+  .inputValidator((d: { slug: string; guestId: string; guestName: string; filter: string; dataUrl: string; originalDataUrl?: string | null; templateId?: string | null; allowDownload?: boolean }) =>
     z.object({
       slug: z.string().min(1),
       guestId: z.string().uuid(),
@@ -101,6 +101,7 @@ export const uploadPhoto = createServerFn({ method: "POST" })
       dataUrl: z.string().startsWith("data:image/").max(20_000_000),
       originalDataUrl: z.string().startsWith("data:image/").max(20_000_000).nullable().optional(),
       templateId: z.string().uuid().nullable().optional(),
+      allowDownload: z.boolean().optional(),
     }).parse(d),
   )
   .handler(async ({ data }) => {
@@ -130,6 +131,7 @@ export const uploadPhoto = createServerFn({ method: "POST" })
       p_filter_applied: data.filter,
       p_original_url: originalPath ?? undefined,
       p_template_id: data.templateId ?? undefined,
+      p_allow_download: data.allowDownload ?? true,
     });
     if (insErr) throw new Error(insErr.message);
     return { id: photoId };
@@ -204,7 +206,7 @@ export const listAlbum = createServerFn({ method: "GET" })
     if (!revealed) return { revealed: false, revealAt: event.reveal_at, items: [] };
 
     const { data: rows, error } = await sb.from("photos")
-      .select("id, guest_name, storage_url, filter_applied, created_at")
+      .select("id, guest_name, storage_url, filter_applied, created_at, allow_download")
       .eq("event_id", event.id).order("created_at", { ascending: false }).limit(500);
     if (error) throw new Error(error.message);
 
@@ -221,6 +223,7 @@ export type PhotoItem = {
   storage_url: string;
   filter_applied: string | null;
   created_at: string;
+  allow_download: boolean;
   signed_url: string;
 };
 
@@ -429,7 +432,7 @@ export const getEventForHost = createServerFn({ method: "GET" })
 
     const [guestRes, photoRes, memRes] = await Promise.all([
       context.supabase.from("guests").select("id, name, created_at").eq("event_id", event.id).order("created_at", { ascending: false }),
-      context.supabase.from("photos").select("id, guest_name, storage_url, filter_applied, created_at").eq("event_id", event.id).order("created_at", { ascending: false }),
+      context.supabase.from("photos").select("id, guest_name, storage_url, filter_applied, created_at, allow_download").eq("event_id", event.id).order("created_at", { ascending: false }),
       context.supabase.from("memories").select("id, guest_name, type, content, audio_url, created_at").eq("event_id", event.id).order("created_at", { ascending: false }),
     ]);
     if (guestRes.error) throw new Error(guestRes.error.message);
