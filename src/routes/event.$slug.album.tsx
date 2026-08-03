@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { listAlbum } from "@/lib/kenangan.functions";
 import { downloadFile, safeFilename } from "@/lib/download";
 import { Download, X } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 export const Route = createFileRoute("/event/$slug/album")({
   component: Album,
@@ -11,12 +12,13 @@ export const Route = createFileRoute("/event/$slug/album")({
 
 function Album() {
   const { slug } = Route.useParams();
+  const { t } = useTranslation();
   const { data, isLoading } = useQuery({
     queryKey: ["album", slug],
     queryFn: () => listAlbum({ data: { slug } }),
     refetchInterval: 15_000,
   });
-  const [lightbox, setLightbox] = useState<string | null>(null);
+  const [lightbox, setLightbox] = useState<{ url: string; allowDownload: boolean } | null>(null);
 
   if (isLoading) return <Center>Loading…</Center>;
   if (!data) return null;
@@ -32,18 +34,20 @@ function Album() {
       ) : (
         <div className="mt-6 grid grid-cols-2 gap-2 sm:grid-cols-3">
           {data.items.map((p) => (
-            <button key={p.id} onClick={() => setLightbox(p.signed_url)}
+            <button key={p.id} onClick={() => setLightbox({ url: p.signed_url, allowDownload: p.allow_download !== false })}
               className="group relative overflow-hidden rounded-2xl border border-ink/10 bg-card">
               <img src={p.signed_url} alt={p.guest_name} className="aspect-square w-full object-cover transition group-hover:scale-105" />
               <span className="absolute inset-x-0 bottom-0 truncate bg-gradient-to-t from-ink/80 to-transparent px-2 py-1.5 text-left text-[11px] italic text-cream">
                 {p.guest_name}
               </span>
-              <span
-                role="button"
-                onClick={(e) => { e.stopPropagation(); downloadFile(p.signed_url, `${safeFilename(slug)}-${safeFilename(p.guest_name)}-${p.id.slice(0,6)}.jpg`); }}
-                className="absolute right-2 top-2 grid h-8 w-8 place-items-center rounded-full bg-cream/85 text-ink">
-                <Download size={14} />
-              </span>
+              {p.allow_download !== false && (
+                <span
+                  role="button"
+                  onClick={(e) => { e.stopPropagation(); downloadFile(p.signed_url, `${safeFilename(slug)}-${safeFilename(p.guest_name)}-${p.id.slice(0,6)}.jpg`); }}
+                  className="absolute right-2 top-2 grid h-8 w-8 place-items-center rounded-full bg-cream/85 text-ink">
+                  <Download size={14} />
+                </span>
+              )}
             </button>
           ))}
         </div>
@@ -52,15 +56,21 @@ function Album() {
       {lightbox && (
         <div onClick={() => setLightbox(null)}
           className="fixed inset-0 z-40 grid place-items-center bg-ink/90 p-4">
-          <img src={lightbox} className="max-h-[85vh] max-w-full rounded-2xl" alt="" />
+          <img src={lightbox.url} className="max-h-[85vh] max-w-full rounded-2xl" alt="" />
           <button className="absolute right-4 top-4 grid h-10 w-10 place-items-center rounded-full bg-cream text-ink">
             <X size={18} />
           </button>
-          <button
-            onClick={(e) => { e.stopPropagation(); downloadFile(lightbox, `${safeFilename(slug)}-photo.jpg`); }}
-            className="absolute bottom-6 inline-flex items-center gap-2 rounded-full bg-cream px-5 py-2.5 text-sm text-ink">
-            <Download size={16} /> Download
-          </button>
+          {lightbox.allowDownload ? (
+            <button
+              onClick={(e) => { e.stopPropagation(); downloadFile(lightbox.url, `${safeFilename(slug)}-photo.jpg`); }}
+              className="absolute bottom-6 inline-flex items-center gap-2 rounded-full bg-cream px-5 py-2.5 text-sm text-ink">
+              <Download size={16} /> Download
+            </button>
+          ) : (
+            <span className="absolute bottom-6 rounded-full bg-ink/70 px-5 py-2.5 text-xs uppercase tracking-wider text-cream/80">
+              {t("consent.downloadDisabled")}
+            </span>
+          )}
         </div>
       )}
     </div>
