@@ -79,6 +79,15 @@ const en = {
     printed: "Sent to printer",
     printFailed: "Could not reach the printer",
   },
+  consent: {
+    title: "Share your photos?",
+    description:
+      "Would you like other guests at this event to be able to view and download your photos from the gallery?",
+    yes: "Yes",
+    no: "No",
+    downloadDisabled: "Download disabled by guest",
+  },
+
 };
 
 export default en;
