@@ -22,6 +22,7 @@ function GuestHome() {
   const [showInvite, setShowInvite] = useState(false);
   const [name, setName] = useState("");
   const [busy, setBusy] = useState(false);
+  const [askConsent, setAskConsent] = useState(false);
 
   useEffect(() => {
     if (!event) return;
@@ -39,14 +40,22 @@ function GuestHome() {
       const existing = loadGuest(slug);
       const sessionToken = existing?.sessionToken ?? newSessionToken();
       const { guestId } = await registerGuest({ data: { slug, name: name.trim(), sessionToken } });
-      saveGuest(slug, { guestId, name: name.trim(), sessionToken });
-      nav({ to: "/event/$slug/capture", params: { slug } });
+      saveGuest(slug, { guestId, name: name.trim(), sessionToken, allowDownload: existing?.allowDownload });
+      setAskConsent(true);
     } catch (err) {
       toast.error((err as Error).message);
     } finally {
       setBusy(false);
     }
   }
+
+  function chooseConsent(allowDownload: boolean) {
+    const guest = loadGuest(slug);
+    if (guest) saveGuest(slug, { ...guest, allowDownload });
+    setAskConsent(false);
+    nav({ to: "/event/$slug/capture", params: { slug } });
+  }
+
 
   if (showInvite && event.invitation_signed_url) {
     return (
