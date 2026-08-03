@@ -1,32 +1,32 @@
-## Plan
+## Goal
 
-1. **Fix the guest write path for photos, notes, and voice**
-   - Add database-backed guest submission functions for:
-     - sending a photo to the album
-     - sending a written wish
-     - uploading a voice memory
-   - These will follow the same safer pattern already used for guest registration.
+On mobile, the Capture screen currently stacks a header, a 3:4 camera box, template chips, filter chips and the shutter vertically, so the shutter falls below the fold and you must scroll to snap. Rebuild Capture as a full-screen camera view (like the third reference image, minus Boomerang).
 
-2. **Validate every guest submission before saving**
-   - Confirm the event exists and is currently `active`.
-   - Confirm the guest ID belongs to that event.
-   - Enforce the admin-set limits for photos, notes, and voice messages.
-   - Reject invalid or mismatched guest names, event slugs, photo paths, audio paths, and note content.
+## What changes (Capture screen only)
 
-3. **Remove the fragile direct table inserts from the public guest flow**
-   - Update the app functions so `Send to album`, `Send wish`, and voice upload call the new validated backend/database functions instead of inserting directly into `photos` or `memories`.
-   - Keep the existing guest pages and UI unchanged.
+1. **Full-bleed camera**
+   - The live video fills the entire viewport (`100dvh`, safe-area aware), object-cover, no page scrolling on this screen.
+   - Event title / guest chip float as a subtle overlay at the top; back arrow on the top-left; flip-camera button near the shutter.
 
-4. **Align access rules with the newer event status system**
-   - Update the relevant photo/audio storage and guest-submission rules to use `status = active` consistently, instead of relying on the older `is_active` field.
-   - This prevents future mismatches when admin changes event status.
+2. **Overlay controls, nothing below the fold**
+   - Filter row: horizontally scrollable thumbnail tiles floating over the camera (labels under each tile, active one ringed) — same look as the reference.
+   - Template row: kept, as a second compact scrollable row above the filters (chips with thumbnails), since templates already exist in this app.
+   - Shutter: large circular button centred at the bottom, always visible, with the flip button to its right and a small "album" thumbnail shortcut to its left.
+   - A "View album" pill below the shutter, matching the reference.
 
-5. **Verify the full guest flow**
-   - Re-test: scan/open event link → enter guest name → open camera → take picture → send to album.
-   - Re-test: Notes → type wish → send.
-   - Re-test: Voice → record → stop/upload.
-   - Confirm rows are saved and no row-level security errors appear.
+3. **Bottom nav on this screen**
+   - The fixed bottom nav currently overlaps the camera controls. On Capture it will be hidden (the overlay provides Home/back and Album shortcuts); it stays unchanged on Home, Album, Notes and Voice.
 
-## About connecting your own backend account
+4. **Preview / after-snap state**
+   - After snapping, the captured photo fills the same full-screen frame with overlaid actions: Retake, Send to album, plus the existing Print buttons when enabled.
+   - Template switching after capture stays available as the same floating row.
 
-This project is already running on Lovable Cloud, which provides the database, auth, storage, and server functions for the app. You do not need to connect a separate external backend account to fix this issue. If you want to migrate the project to a separate external account later, we should treat that as a separate migration task after the guest upload bugs are fixed.
+5. **No behaviour changes**
+   - Capture, filter, template compositing, upload, print, and limits logic stay exactly as they are today. This is a layout/presentation change.
+
+## Technical notes
+
+- Rework only `src/routes/event.$slug.capture.tsx` plus a small conditional in `src/routes/event.$slug.tsx` to skip `BottomNav` and the floating header controls on `/event/$slug/capture`.
+- Use `h-[100dvh]`, `fixed inset-0`, `overflow-hidden`, and `env(safe-area-inset-*)` padding so Android/iOS browser chrome does not push controls off screen.
+- Keep all colours on existing semantic tokens; overlay surfaces use translucent ink/cream so it works in both light and dark themes.
+- No Boomerang mode.
