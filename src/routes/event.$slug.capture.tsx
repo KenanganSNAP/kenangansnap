@@ -80,6 +80,21 @@ function Capture() {
     return () => { cancelled = true; streamRef.current?.getTracks().forEach((t) => t.stop()); };
   }, [facing]);
 
+  // Re-attach the live stream whenever we leave the preview state (or return to the tab)
+  useEffect(() => {
+    if (preview) return;
+    function reattach() {
+      const v = videoRef.current;
+      const stream = streamRef.current;
+      if (!v || !stream) return;
+      if (v.srcObject !== stream) v.srcObject = stream;
+      if (v.paused) v.play().catch(() => {});
+    }
+    reattach();
+    document.addEventListener("visibilitychange", reattach);
+    return () => document.removeEventListener("visibilitychange", reattach);
+  }, [preview]);
+
   function loadImage(src: string): Promise<HTMLImageElement> {
     return new Promise((resolve, reject) => {
       const img = new Image();
@@ -159,18 +174,15 @@ function Capture() {
     <div className="fixed inset-0 z-40 overflow-hidden bg-ink">
       {/* Camera / preview surface */}
       <div className="absolute inset-0">
-        {preview ? (
-          <img src={preview} className="h-full w-full object-cover" alt="preview" />
-        ) : (
-          <>
-            <video ref={videoRef} playsInline muted
-              style={{ filter: getFilterCss(filter), transform: facing === "user" ? "scaleX(-1)" : undefined }}
-              className="h-full w-full object-cover" />
-            {activeTpl?.asset_url && (
-              <img src={activeTpl.asset_url} alt=""
-                className="pointer-events-none absolute inset-0 h-full w-full object-cover" />
-            )}
-          </>
+        <video ref={videoRef} playsInline muted autoPlay
+          style={{ filter: getFilterCss(filter), transform: facing === "user" ? "scaleX(-1)" : undefined }}
+          className="h-full w-full object-cover" />
+        {!preview && activeTpl?.asset_url && (
+          <img src={activeTpl.asset_url} alt=""
+            className="pointer-events-none absolute inset-0 h-full w-full object-cover" />
+        )}
+        {preview && (
+          <img src={preview} className="absolute inset-0 h-full w-full object-cover" alt="preview" />
         )}
       </div>
 
