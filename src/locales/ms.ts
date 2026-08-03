@@ -81,6 +81,15 @@ const ms: Translations = {
     printed: "Dihantar ke pencetak",
     printFailed: "Tidak dapat hubungi pencetak",
   },
+  consent: {
+    title: "Kongsi gambar anda?",
+    description:
+      "Adakah anda mahu tetamu lain di majlis ini melihat dan memuat turun gambar anda dari galeri?",
+    yes: "Ya",
+    no: "Tidak",
+    downloadDisabled: "Muat turun dimatikan oleh tetamu",
+  },
+
 };
 
 export default ms;

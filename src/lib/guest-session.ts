@@ -3,7 +3,9 @@ export type GuestSession = {
   guestId: string;
   name: string;
   sessionToken: string;
+  allowDownload?: boolean;
 };
+
 
 const key = (slug: string) => `kenangansnap:guest:${slug}`;
 const seenKey = (slug: string) => `kenangansnap:invitation-seen:${slug}`;
