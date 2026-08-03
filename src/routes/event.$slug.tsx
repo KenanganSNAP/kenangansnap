@@ -42,11 +42,12 @@ function EventLayout() {
   }
 
   // Hide bottom nav on index (welcome) since invitation/name take over.
-  const showNav = loc.pathname !== `/event/${slug}`;
+  const isCapture = loc.pathname === `/event/${slug}/capture`;
+  const showNav = loc.pathname !== `/event/${slug}` && !isCapture;
 
   return (
-    <div className="min-h-screen pb-24">
-      <div className="absolute right-3 top-3 z-10"><HeaderControls /></div>
+    <div className={isCapture ? "min-h-screen" : "min-h-screen pb-24"}>
+      {!isCapture && <div className="absolute right-3 top-3 z-10"><HeaderControls /></div>}
       <Outlet />
       {showNav && <BottomNav slug={slug} />}
     </div>

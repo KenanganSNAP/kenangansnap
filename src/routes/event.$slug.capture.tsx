@@ -1,4 +1,4 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -8,7 +8,7 @@ import { uploadPhoto } from "@/lib/kenangan.functions";
 import { listTemplatesForEvent, type TemplateRow } from "@/lib/templates.functions";
 import { getPrintConfigPublic } from "@/lib/print.functions";
 import { PrintOptionsSheet } from "@/components/print-options-sheet";
-import { RotateCcw, Circle, Printer } from "lucide-react";
+import { RotateCcw, Printer, ArrowLeft, Images, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 export const Route = createFileRoute("/event/$slug/capture")({
@@ -153,12 +153,12 @@ function Capture() {
     setOriginalPreview(null);
   }
 
-  return (
-    <div className="mx-auto max-w-md px-4 pt-6">
-      <div className="text-center text-[10px] uppercase tracking-[0.3em] text-ink/55">Capture</div>
-      <h1 className="text-center font-serif text-3xl italic">Strike a pose</h1>
+  const activeTpl = templates.find((x) => x.id === templateId);
 
-      <div className="relative mt-4 aspect-[3/4] overflow-hidden rounded-3xl border border-ink/10 bg-ink shadow-[0_20px_50px_-25px_rgba(40,25,15,0.5)]">
+  return (
+    <div className="fixed inset-0 z-40 overflow-hidden bg-ink">
+      {/* Camera / preview surface */}
+      <div className="absolute inset-0">
         {preview ? (
           <img src={preview} className="h-full w-full object-cover" alt="preview" />
         ) : (
@@ -166,77 +166,125 @@ function Capture() {
             <video ref={videoRef} playsInline muted
               style={{ filter: getFilterCss(filter), transform: facing === "user" ? "scaleX(-1)" : undefined }}
               className="h-full w-full object-cover" />
-            {templateId && templates.find((x) => x.id === templateId)?.asset_url && (
-              <img src={templates.find((x) => x.id === templateId)!.asset_url!} alt=""
+            {activeTpl?.asset_url && (
+              <img src={activeTpl.asset_url} alt=""
                 className="pointer-events-none absolute inset-0 h-full w-full object-cover" />
             )}
-            <button onClick={() => setFacing((f) => (f === "user" ? "environment" : "user"))}
-              className="absolute right-3 top-3 grid h-9 w-9 place-items-center rounded-full bg-cream/80 text-ink">
-              <RotateCcw size={16} />
-            </button>
           </>
         )}
       </div>
 
-      {!preview ? (
-        <>
-          {templates.length > 0 && (
-            <div className="mt-4">
-              <div className="mb-1 text-[10px] uppercase tracking-[0.3em] text-ink/55">{t("booth.chooseTemplate")}</div>
-              <div className="flex gap-2 overflow-x-auto pb-2">
-                <TemplateChip active={templateId === null} onClick={() => setTemplateId(null)} label={t("booth.none")} />
-                {templates.map((tp) => (
-                  <TemplateChip key={tp.id} active={templateId === tp.id} onClick={() => setTemplateId(tp.id)}
-                    label={tp.name} thumb={tp.preview_url ?? tp.asset_url} />
-                ))}
-              </div>
-            </div>
-          )}
-          <div className="mt-2 flex gap-2 overflow-x-auto pb-2">
+      {/* Top bar */}
+      <div
+        className="absolute inset-x-0 top-0 flex items-center justify-between px-4"
+        style={{ paddingTop: "max(env(safe-area-inset-top), 0.75rem)" }}
+      >
+        <Link
+          to="/event/$slug"
+          params={{ slug }}
+          className="grid h-10 w-10 place-items-center rounded-full bg-ink/45 text-cream backdrop-blur"
+          aria-label="Back"
+        >
+          <ArrowLeft size={18} />
+        </Link>
+        <span className="rounded-full bg-ink/45 px-4 py-1.5 font-serif text-sm italic text-cream backdrop-blur">
+          {loadGuest(slug)?.name ?? "Capture"}
+        </span>
+        {preview ? (
+          <button onClick={retake} aria-label={t("booth.retake")}
+            className="grid h-10 w-10 place-items-center rounded-full bg-ink/45 text-cream backdrop-blur">
+            <X size={18} />
+          </button>
+        ) : (
+          <button onClick={() => setFacing((f) => (f === "user" ? "environment" : "user"))}
+            aria-label="Flip camera"
+            className="grid h-10 w-10 place-items-center rounded-full bg-ink/45 text-cream backdrop-blur">
+            <RotateCcw size={18} />
+          </button>
+        )}
+      </div>
+
+      {/* Bottom control stack */}
+      <div
+        className="absolute inset-x-0 bottom-0 space-y-3"
+        style={{ paddingBottom: "max(env(safe-area-inset-bottom), 0.75rem)" }}
+      >
+        {templates.length > 0 && (
+          <div className="flex gap-2 overflow-x-auto px-4 pb-1">
+            <TemplateChip active={templateId === null} onClick={() => (preview ? changeTemplate(null) : setTemplateId(null))} label={t("booth.none")} />
+            {templates.map((tp) => (
+              <TemplateChip key={tp.id} active={templateId === tp.id}
+                onClick={() => (preview ? changeTemplate(tp.id) : setTemplateId(tp.id))}
+                label={tp.name} thumb={tp.preview_url ?? tp.asset_url} />
+            ))}
+          </div>
+        )}
+
+        {!preview && (
+          <div className="flex gap-3 overflow-x-auto px-4 pb-1">
             {FILTERS.map((f) => (
-              <button key={f.id} onClick={() => setFilter(f.id)}
-                className={`shrink-0 rounded-full border px-4 py-1.5 text-xs uppercase tracking-wider ${
-                  filter === f.id ? "border-ink bg-ink text-cream" : "border-ink/15 bg-card text-ink/70"
-                }`}>
-                {f.label}
+              <button key={f.id} onClick={() => setFilter(f.id)} className="shrink-0 text-center">
+                <span
+                  className={`grid h-14 w-14 place-items-center overflow-hidden rounded-2xl border-2 bg-ink/50 text-[10px] uppercase tracking-wide text-cream/90 backdrop-blur ${
+                    filter === f.id ? "border-gold" : "border-cream/25"
+                  }`}
+                  style={{ filter: f.id === "none" ? undefined : getFilterCss(f.id) }}
+                >
+                  {f.label.slice(0, 2)}
+                </span>
+                <span className={`mt-1 block text-[9px] uppercase tracking-[0.15em] ${filter === f.id ? "text-gold" : "text-cream/75"}`}>
+                  {f.label}
+                </span>
               </button>
             ))}
           </div>
-          <div className="mt-4 grid place-items-center">
-            <button onClick={snap}
-              className="grid h-20 w-20 place-items-center rounded-full border-4 border-ink bg-cream shadow-[0_15px_30px_-15px_rgba(40,25,15,0.5)] active:scale-95">
-              <Circle size={56} fill="currentColor" className="text-ink" />
-            </button>
-          </div>
-        </>
-      ) : (
-        <div className="mt-4 space-y-2">
-          {templates.length > 0 && (
-            <div className="flex gap-2 overflow-x-auto pb-1">
-              <TemplateChip active={templateId === null} onClick={() => changeTemplate(null)} label={t("booth.none")} />
-              {templates.map((tp) => (
-                <TemplateChip key={tp.id} active={templateId === tp.id} onClick={() => changeTemplate(tp.id)}
-                  label={tp.name} thumb={tp.preview_url ?? tp.asset_url} />
-              ))}
+        )}
+
+        {!preview ? (
+          <>
+            <div className="grid grid-cols-[1fr_auto_1fr] items-center px-6">
+              <div />
+              <button onClick={snap} aria-label="Take photo"
+                className="grid h-20 w-20 place-items-center rounded-full border-4 border-cream/90 bg-cream/25 backdrop-blur active:scale-95">
+                <span className="h-14 w-14 rounded-full bg-cream" />
+              </button>
+              <div className="flex justify-end">
+                <button onClick={() => setFacing((f) => (f === "user" ? "environment" : "user"))}
+                  aria-label="Flip camera"
+                  className="grid h-11 w-11 place-items-center rounded-full bg-ink/45 text-cream backdrop-blur">
+                  <RotateCcw size={18} />
+                </button>
+              </div>
             </div>
-          )}
-          <div className="grid grid-cols-2 gap-2">
-            <button onClick={retake} className="rounded-xl border border-ink/15 bg-card py-3">{t("booth.retake")}</button>
-            <button disabled={busy} onClick={send} className="rounded-xl bg-ink py-3 text-cream disabled:opacity-50">
-              {busy ? "Sending…" : "Send to album"}
+            <div className="flex justify-center px-6">
+              <Link to="/event/$slug/album" params={{ slug }}
+                className="flex items-center gap-2 rounded-full bg-ink/50 px-5 py-2.5 text-xs uppercase tracking-[0.2em] text-cream backdrop-blur">
+                <Images size={15} /> {t("bottomNav.album")}
+              </Link>
+            </div>
+          </>
+        ) : (
+          <div className="space-y-2 px-4">
+            <div className="grid grid-cols-2 gap-2">
+              <button onClick={retake} className="rounded-xl bg-ink/50 py-3 text-cream backdrop-blur">{t("booth.retake")}</button>
+              <button disabled={busy} onClick={send} className="rounded-xl bg-cream py-3 text-ink disabled:opacity-50">
+                {busy ? "Sending…" : "Send to album"}
+              </button>
+            </div>
+            {printCfg?.enabled && (
+              <button onClick={() => setPrintOpen(true)}
+                className="flex w-full items-center justify-center gap-2 rounded-xl bg-ink/60 py-3 text-cream backdrop-blur">
+                <Printer size={16} /> {t("booth.sendToPrinter")}
+              </button>
+            )}
+            <button onClick={printPhoto}
+              className="flex w-full items-center justify-center gap-2 rounded-xl border border-cream/30 bg-ink/40 py-3 text-cream backdrop-blur">
+              <Printer size={16} /> {t("booth.printLocal")}
             </button>
           </div>
-          {printCfg?.enabled && (
-            <button onClick={() => setPrintOpen(true)}
-              className="flex w-full items-center justify-center gap-2 rounded-xl bg-ink/90 py-3 text-cream">
-              <Printer size={16} /> {t("booth.sendToPrinter")}
-            </button>
-          )}
-          <button onClick={printPhoto} className="flex w-full items-center justify-center gap-2 rounded-xl border border-ink/15 bg-card py-3 text-ink">
-            <Printer size={16} /> {t("booth.printLocal")}
-          </button>
-        </div>
-      )}
+        )}
+      </div>
+
       {printCfg?.enabled && (
         <PrintOptionsSheet
           open={printOpen}
@@ -255,8 +303,8 @@ function Capture() {
 function TemplateChip({ active, onClick, label, thumb }: { active: boolean; onClick: () => void; label: string; thumb?: string | null }) {
   return (
     <button onClick={onClick}
-      className={`flex shrink-0 items-center gap-2 rounded-full border px-2 py-1 text-xs ${active ? "border-ink bg-ink text-cream" : "border-ink/15 bg-card text-ink/70"}`}>
-      <span className={`grid h-7 w-7 place-items-center overflow-hidden rounded-full ${active ? "bg-cream/20" : "bg-[repeating-conic-gradient(#eee_0_25%,#fff_0_50%)] bg-[length:10px_10px]"}`}>
+      className={`flex shrink-0 items-center gap-2 rounded-full border px-2 py-1 text-xs backdrop-blur ${active ? "border-gold bg-cream text-ink" : "border-cream/25 bg-ink/45 text-cream/85"}`}>
+      <span className={`grid h-7 w-7 place-items-center overflow-hidden rounded-full ${active ? "bg-ink/10" : "bg-cream/15"}`}>
         {thumb ? <img src={thumb} alt="" className="h-full w-full object-contain" /> : <span>{active ? "✓" : "—"}</span>}
       </span>
       <span className="pr-2 italic">{label}</span>
