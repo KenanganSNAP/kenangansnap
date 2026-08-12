@@ -1,0 +1,1 @@
+DROP FUNCTION IF EXISTS public.submit_guest_photo(text, uuid, text, text, text, text, uuid);

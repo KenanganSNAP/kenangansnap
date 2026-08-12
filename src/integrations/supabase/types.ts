@@ -554,32 +554,19 @@ export type Database = {
         }
         Returns: string
       }
-      submit_guest_photo:
-        | {
-            Args: {
-              p_filter_applied?: string
-              p_guest_id: string
-              p_guest_name: string
-              p_original_url?: string
-              p_slug: string
-              p_storage_url: string
-              p_template_id?: string
-            }
-            Returns: string
-          }
-        | {
-            Args: {
-              p_allow_download?: boolean
-              p_filter_applied?: string
-              p_guest_id: string
-              p_guest_name: string
-              p_original_url?: string
-              p_slug: string
-              p_storage_url: string
-              p_template_id?: string
-            }
-            Returns: string
-          }
+      submit_guest_photo: {
+        Args: {
+          p_allow_download?: boolean
+          p_filter_applied?: string
+          p_guest_id: string
+          p_guest_name: string
+          p_original_url?: string
+          p_slug: string
+          p_storage_url: string
+          p_template_id?: string
+        }
+        Returns: string
+      }
       submit_guest_voice: {
         Args: {
           p_audio_url: string
